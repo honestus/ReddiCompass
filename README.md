@@ -12,7 +12,7 @@ This project implements:
 
 - A Reddit-specific preprocessing pipeline tailored to the linguistic and structural peculiarities of Reddit posts and comments.
 - A flexible feature extraction system that combines:
-  - **Reddit and online social media textual features** (mentions, hashtags, emojis, emoticons, exclamation marks, UPPER words and so on) - which are handled as individual tokens!
+  - **Reddit and online SNSs textual features** (mentions, hashtags, emojis, emoticons, exclamation marks, UPPER words and so on) - **handled as individual tokens!**
   - **Lexical features** (e.g., token frequencies, n-grams)
   - **Syntactic features** (e.g., POS tagging, dependency parsing)
   - **Semantic features** (e.g., embeddings, sentiment, topic distributions)
