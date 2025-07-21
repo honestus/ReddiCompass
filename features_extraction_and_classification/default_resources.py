@@ -36,14 +36,11 @@ def get_spacy_nlp():
 def __load_word2vec_model__(model_path):
     from gensim.models import KeyedVectors
     from pathlib import Path
-    def download_word2vec_model(model_url, model_path_destination):
-        model=''
-        raise NotImplementedError('no download method')
-        print("Downloading word2vec model. It may take some time, it's a 4GB file size.")
-        return True
+    from download_utils import download_from_huggingface
+        
     model_path = Path(model_path)
     if not model_path.exists():
-        download_word2vec_model(model_url='',model_path_destination=model_path)
+        download_from_huggingface(huggingface_repo='honestus/twitter_word2vec', filename='word2vec_twitter_model.bin' , saving_path=model_path)
     word2vec_model = KeyedVectors.load_word2vec_format(model_path, binary=True, unicode_errors='ignore')
     return word2vec_model
         

@@ -2,6 +2,7 @@ jupyter_files/
 *.ipynb_checkpoints
 __pycache__/
 */__pycache__/*
+data/word2vec_twitter_model.bin
 rundata/*
 !rundata/models/
 rundata/models/*
