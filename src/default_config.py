@@ -1,8 +1,7 @@
 import os
-
 from utils import get_package_root
+
 _curr_root = get_package_root()
-print(f'ROOT: {_curr_root}')
 word2vec_model_filename = _curr_root.joinpath("data/word2vec_twitter_model.bin")
 nrc_lexicon_filename = _curr_root.joinpath("data/lexicon/NRC-Emotion-Lexicon/NRC-Emotion-Lexicon-Wordlevel-v0.92.txt")
 vad_lexicon_filename = _curr_root.joinpath("data/lexicon/NRC-VAD-Lexicon/NRC-VAD-Lexicon.txt")

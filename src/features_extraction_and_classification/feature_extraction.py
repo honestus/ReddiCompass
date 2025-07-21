@@ -1,16 +1,17 @@
 import pandas as pd
 import numpy as np
 from nltk.corpus import wordnet
-import default_config, default_resources
+import default_config
+import features_extraction_and_classification.default_resources as default_resources
 from text_processing.text_utils import get_wordnet_pos
-from text_processing.myText import MyText
+from text_processing.textractor import TexTractor
 from text_processing.text_replacement import replace_features_in_text
 from text_processing.LexiconMatcher import LexiconMatcher
 from features_extraction_and_classification.contextual_features_extraction import *
 from sklearn.feature_extraction.text import TfidfTransformer, CountVectorizer
 from sklearn.feature_selection import SelectKBest, chi2
 from sklearn.pipeline import Pipeline
-from tfidf_utils import do_nothing
+from features_extraction_and_classification.tfidf_utils import do_nothing
 import warnings
 
 def __fillna__(feature_series, training_set):
@@ -60,20 +61,20 @@ def map_tags_to_count(tags_series, normalize=False):
 
 
 def __validate_text_input__(text):
-    if isinstance(text, (str, MyText)):
+    if isinstance(text, (str, TexTractor)):
         return [text]
     if isinstance(text, (list, np.ndarray, pd.Series)):
-        if any(not isinstance(txt, (str, MyText)) for txt in text):
-            raise ValueError("Input must be either a string, a MyText instance, or a collection (list, array, pandas.Series) of such types")
+        if any(not isinstance(txt, (str, TexTractor)) for txt in text):
+            raise ValueError("Input must be either a string, a TexTractor instance, or a collection (list, array, pandas.Series) of such types")
         return text
-    raise ValueError( "Input must be either a string, a MyText instance, or a collection (list, array, pandas.Series) of such types")
+    raise ValueError( "Input must be either a string, a TexTractor instance, or a collection (list, array, pandas.Series) of such types")
 
     
 def __extract_textual_features_single_text__(text):
-    if not isinstance(text, (str, MyText)):
-        raise ValueError('Wrong input, must pass either a string or a MyText object')
+    if not isinstance(text, (str, TexTractor)):
+        raise ValueError('Wrong input, must pass either a string or a TexTractor object')
     if isinstance(text, str):
-        text = MyText(text)
+        text = TexTractor(text)
     text = text.process()
     text.get_sentences()
     return text    
@@ -92,7 +93,6 @@ def get_tfidf_extractor(ngram_range):
     return tfidf_extractor
 
 def extract_tfidf(tokenized_corpus, fit, tfidf_extractor, ngram_range=(1,1), to_df=False, **kwargs):
-    print(tokenized_corpus)
     if tfidf_extractor is None or not tfidf_extractor:
         tfidf_extractor=get_tfidf_extractor(ngram_range=ngram_range)   
     if fit:
@@ -163,7 +163,7 @@ def __extract_no_tfidf_features__(text, yield_text_tfidf=True):
 
 def __extract_features_in_batches__(texts, batch_size, tfidf_extractor, fit_tfidf, saving_directory=False, already_processed_features=None,
     already_processed_tokens=None, **kwargs):
-    import os, io_utils
+    import os, features_extraction_and_classification.io_utils as io_utils
         
     if fit_tfidf and ('y' not in kwargs):
         raise ValueError('Must pass categories through the "y" variable to fit tfidf_extractor')
@@ -214,7 +214,7 @@ def __extract_features_in_batches__(texts, batch_size, tfidf_extractor, fit_tfid
     return final_features
 
 def extract_features(text, tfidf_extractor, fit_tfidf, saving_directory=False, overwrite=False, resume_mode=False, **kwargs):
-    from io_utils import prepare_new_directory
+    from features_extraction_and_classification.io_utils import prepare_new_directory
     #from pathlib import Path
     text = pd.Series(__validate_text_input__(text))
     batch_size = kwargs.pop("batch_size", False)

@@ -7,7 +7,7 @@ from sklearn.svm import LinearSVC
 from features_extraction_and_classification.feature_extraction import extract_features, get_tfidf_extractor, __validate_text_input__
 import features_extraction_and_classification.io_utils as io_utils
 import features_extraction_and_classification.resume_utils as resume_utils
-from resume_utils import validate_meta_file, store_meta_file
+from features_extraction_and_classification.resume_utils import validate_meta_file, store_meta_file
 
 import shutil
 """
@@ -58,7 +58,7 @@ def predict(texts=None , model_dir=None, resume_dir=False, save=False, batch_siz
         model_dir = str(io_utils.STANDARD_MODEL_PATH)
     else:
         model_dir = io_utils.validate_existing_model_dir(model_dir)
-    print(f'Curr model directory: {model_dir}')
+    print(f'Current model directory of the model used for predicting: {model_dir}')
     tfidf_extractor = io_utils.load_model(model_dir + f'/{io_utils.TFIDF_EXTRACTOR_FILENAME}')
     
     

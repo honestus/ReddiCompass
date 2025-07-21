@@ -6,9 +6,9 @@ from nltk import ne_chunk , pos_tag#, word_tokenize,
 from nltk.corpus import wordnet
 from pattern.en import sentiment as pattern_sentiment
 from pattern.en import modality
-from text_processing.myText import MyText
+from text_processing.textractor import TexTractor
 from text_processing.text_replacement import replace_features_in_text
-import default_config, default_resources
+import default_config, features_extraction_and_classification.default_resources as default_resources
 
 
 """
@@ -25,19 +25,19 @@ spacy_entities_cols = ['CARDINAL', 'DATE', 'EVENT', 'FAC', 'GPE', 'LANGUAGE', 'L
 nltk_entities_cols = ['facility', 'gpe', 'gsp', 'location', 'organization', 'person']
 
 
-def extract_pos_tags(tokenized_text: MyText or list[str], filter_nonstopwords_only: bool = True, tokens_col: str = 'tokens') -> list[tuple[str,str]]:
+def extract_pos_tags(tokenized_text: TexTractor or list[str], filter_nonstopwords_only: bool = True, tokens_col: str = 'tokens') -> list[tuple[str,str]]:
     if not filter_nonstopwords_only:
-        if isinstance(tokenized_text, MyText):
+        if isinstance(tokenized_text, TexTractor):
             tokenized_text = tokenized_text.process()
-        if isinstance(tokenized_text, (MyText, pd.Series)):
+        if isinstance(tokenized_text, (TexTractor, pd.Series)):
             tokenized_text = tokenized_text[tokens_col]
         if not isinstance(tokenized_text, (list, np.ndarray)):
             raise ValueError('Wrong input - need a list of tokens to map to pos tags')
         tagged_tokens = pos_tag(tokenized_text)
         return tagged_tokens
-    if not isinstance(tokenized_text, (MyText, pd.Series)):
-        raise ValueError('You must pass a MyText instance to remove stopwords and urls/mentions/emojis/emoticons from tokens')
-    if isinstance(tokenized_text, MyText):
+    if not isinstance(tokenized_text, (TexTractor, pd.Series)):
+        raise ValueError('You must pass a TexTractor instance to remove stopwords and urls/mentions/emojis/emoticons from tokens')
+    if isinstance(tokenized_text, TexTractor):
         tokenized_text = tokenized_text.process()
 
     mytext = tokenized_text

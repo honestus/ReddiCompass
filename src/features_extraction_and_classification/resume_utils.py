@@ -1,9 +1,8 @@
 from pathlib import Path
 import json
 import pandas as pd
-from features_extraction_and_classification.io_utils import get_whole_filelist
 from utils import get_columns_from_parquet_file
-from io_utils import TEXTS_FILENAME, TFIDF_TOKENS_FILENAME, FEATURES_FILENAME, get_stored_features_files, get_stored_tokens_files
+from features_extraction_and_classification.io_utils import TEXTS_FILENAME, TFIDF_TOKENS_FILENAME, FEATURES_FILENAME, get_stored_features_files, get_stored_tokens_files, get_whole_filelist
 from default_config import ALL_FEATURES_COLUMNS
 
 META_FILENAME = 'meta.json'

@@ -18,7 +18,7 @@ from nltk.tokenize import sent_tokenize
 
 
 
-class MyFeature:
+class TextualFeature:
     def __init__(self, feature_type, feature_value, match_start=None, match_end=None, replacement_string=None, position_in_text=None, subcategory=None) -> None:
         """        
         :param feature_type: str 
@@ -83,28 +83,28 @@ class MyFeature:
     def __getitem__(self, key):
         return getattr(self, key if key!=self.feature_type else 'feature_value') 
     
-    def copy(self) -> "MyFeature":
-        return MyFeature(**vars(self))
+    def copy(self) -> "TextualFeature":
+        return TextualFeature(**vars(self))
 
 
-class MyText:
-    def __init__(self, text_data: "str | pd.Series | MyText", pre_sanitize: bool = False, tokenizer=None, *,
+class TexTractor:
+    def __init__(self, text_data: "str | pd.Series | TexTractor", pre_sanitize: bool = False, tokenizer=None, *,
                  text_col: str = None, tokens_col: str = None, sentences_col: str = None) -> None:
         """
-        :param text_data: Can either be a MyText instance, a string, or a row of a pandas dataframe, having columns for each feature
+        :param text_data: Can either be a TexTractor instance, a string, or a row of a pandas dataframe, having columns for each feature
         :param tokenizer: The tokenizer to use (default is TweetTokenizer if None)
         :param text_col: The name of the column containing the text (necessary if input_data is a row of a dataframe)
         :param tokens_col: The name of the column containing the tokens
                 (if None and text_data comes from a dataframe row, default='tokens'...
                 if tokens_col not in text_data, self.tokens=None by default)
 """
-        # Se il tokenizer non è specificato, usa TweetTokenizer di default
+        # If no tokenizer is given at init, it will use the TweetTokenizer by default
         self.tokenizer = tokenizer if tokenizer is not None else TweetTokenizer(strip_handles=False, reduce_len=True)
 
         if not isinstance(text_data, str) and pre_sanitize:
             warnings.warn("'pre_sanitize' is ignored for an already processed text. Please instantiate a new text from string to use it properly.")
             #pre_sanitize = False
-        if not isinstance(text_data, MyText):
+        if not isinstance(text_data, TexTractor):
             self._features_names_ = [default_config.default_emojis_colname,
                                   default_config.default_emoticons_colname,
                                   default_config.default_urls_colname,
@@ -118,7 +118,7 @@ class MyText:
             for f in self._features_names_:
                 setattr(self, f, None)
             self.is_processed = False  # Not processed...
-            self.tokens = None  # I tokens saranno estratti al momento del process
+            self.tokens = None  # Will extract all of the features/tokens/sentences when processing
             self.sentences = None
         
         elif isinstance(text_data, pd.Series):  # from already existing text (i.e. a DataFrame row containing all the features)
@@ -130,20 +130,20 @@ class MyText:
                 sentences_col = 'sentences' if text_col!='sentences' else None
             self.text = text_data[text_col]
             for f in self._features_names_:
-                curr_feature_list = list(map(lambda feat: dict_to_My_Feature(feat) if isinstance(feat,dict) else dict_to_My_Feature({default_config.single_feature_names_dict[f]:feat}) if isinstance (feat, str) else feat , text_data.get(f, None) ))
+                curr_feature_list = list(map(lambda feat: dict_to_TextualFeature(feat) if isinstance(feat,dict) else dict_to_TextualFeature({default_config.single_feature_names_dict[f]:feat}) if isinstance (feat, str) else feat , text_data.get(f, None) ))
                 setattr(self, f, curr_feature_list)
-            self.tokens = text_data.get(tokens_col, None)  # Se è presente anche la colonna 'tokens'
-            self.sentences = text_data.get(sentences_col, None)  # Se è presente anche la colonna 'tokens'
+            self.tokens = text_data.get(tokens_col, None)  
+            self.sentences = text_data.get(sentences_col, None)  
 
             if 'clean_text' in text_data:
-                self.clean_text = text_data.get('clean_text', None)  # Se è presente anche la colonna 'clean_text'
+                self.clean_text = text_data.get('clean_text', None)  
 
             if all(map(lambda x: x is None, [getattr(self, f) for f in self._features_names_]) ):
                    self.is_processed = False
             else:
                    self.is_processed = True  # Already processed
 
-        elif isinstance(text_data, MyText):
+        elif isinstance(text_data, TexTractor):
             text_data_attributes = vars(text_data)
             for k, v in text_data_attributes.items():
                 setattr(self, k, v)
@@ -158,7 +158,6 @@ class MyText:
         Will print the name of the current features and the number of extracted features for each feature type
         """
         features_dict = {attr: getattr(self, attr) for attr in self._features_names_ + ['tokens']}
-        # Crea la stringa di output per ogni feature, mostrando il nome e il numero di elementi
         features_summary = "\n".join([f"{feature}: {len(value) if value is not None else 0}"
                                       for feature, value in features_dict.items()])
 
@@ -167,9 +166,9 @@ class MyText:
     def __repr__(self):
         return self.text
 
-    def __eq__(self, other: "MyText"):
-        if not isinstance(other, MyText):
-            raise TypeError('other must be an instance of MyText')
+    def __eq__(self, other: "TexTractor"):
+        if not isinstance(other, TexTractor):
+            raise TypeError('other must be an instance of TexTractor')
         return self.text == other.text
 
 
@@ -186,7 +185,7 @@ class MyText:
     
     def process(self, force=False) -> None:
         """
-        Processes current MyText by extracting all features, extracting tokens and getting the clean text with no punctuations, no numbers, no features.
+        Processes current TexTractor by extracting all features, extracting tokens and getting the clean text with no punctuations, no numbers, no features.
         """
         if force:
             for f in self._features_names_:
@@ -198,7 +197,7 @@ class MyText:
             curr_feat_name = default_config.single_feature_names_dict[default_config.default_emojis_colname]
             emojis_gen = extract_emojis(curr_text, retain_length=True)
             found_emojis = next(emojis_gen)
-            emojis_features = list(map(lambda p: MyFeature(
+            emojis_features = list(map(lambda p: TextualFeature(
                 feature_type=default_config.single_feature_names_dict[default_config.default_emojis_colname], 
                 feature_value=p[curr_feat_name], match_start=p['match_start'], match_end=p['match_end'] ), 
                                        found_emojis) )
@@ -210,7 +209,7 @@ class MyText:
         if getattr(self, default_config.default_emoticons_colname) is None:
             emoticons_gen = extract_emoticons(curr_text, retain_length=True, position=True)
             found_emoticons = next(emoticons_gen)
-            emoticons_features = list(map(lambda p: MyFeature(
+            emoticons_features = list(map(lambda p: TextualFeature(
                 feature_type=default_config.single_feature_names_dict[default_config.default_emoticons_colname], 
                 feature_value=p[0], match_start=p[1][0], match_end=p[1][1] ), 
                                           found_emoticons) )
@@ -219,7 +218,7 @@ class MyText:
         if getattr(self, default_config.default_urls_colname) is None:
             urls_gen = extract_url(curr_text, retain_length=True, replace_string='', position=True)
             found_urls = next(urls_gen)
-            urls_features = list(map(lambda p: MyFeature(
+            urls_features = list(map(lambda p: TextualFeature(
                 feature_type=default_config.single_feature_names_dict[default_config.default_urls_colname],
                 feature_value=p[0], match_start=p[1][0], match_end=p[1][1] ), 
                                      found_urls) )
@@ -237,7 +236,7 @@ class MyText:
         if getattr(self, default_config.default_repeated_punctuation_colname) is None:
             punct_gen = extract_repeated_punctuation_marks(curr_text, replace_string=' ', retain_length=True, position=True)
             found_punctuations = next(punct_gen)
-            punctuations_features = list(map(lambda p: MyFeature(
+            punctuations_features = list(map(lambda p: TextualFeature(
                 feature_type=default_config.single_feature_names_dict[default_config.default_repeated_punctuation_colname], 
                 feature_value=p[0], match_start=p[1][0], match_end=p[1][1] ), 
                                              found_punctuations) )
@@ -246,7 +245,7 @@ class MyText:
         if getattr(self, default_config.default_mentions_colname) is None:
             mentions_gen = extract_mentions(curr_text, retain_length=True, position=True)
             found_mentions = next(mentions_gen)
-            mentions_features = list(map(lambda p: MyFeature(
+            mentions_features = list(map(lambda p: TextualFeature(
                 feature_type=default_config.single_feature_names_dict[default_config.default_mentions_colname], 
                 feature_value=p[0], match_start=p[1][0], match_end=p[1][1], subcategory='user' if p[0].startswith('u/') else 'subreddit' if p[0].startswith('r/') else None ), 
                                          found_mentions) )
@@ -263,7 +262,7 @@ class MyText:
             self.tokens = replace_features_in_text(self, text_col='tokens', revert=True)
         if self.hashtags is None:
             hashtags_found = [(p,t) for p,t in enumerate(self.tokens) if t.startswith('#') and len(t)>2 and any([str.isalpha(char) for char in t]) and t.count('#')<2 and t[1:6].lower()!='x200b']
-            hashtags_features = list(map(lambda hasht: MyFeature(
+            hashtags_features = list(map(lambda hasht: TextualFeature(
                 feature_type=default_config.single_feature_names_dict[default_config.default_hashtags_colname], 
                 feature_value=hasht[1], position_in_text=hasht[0] ),
                                          hashtags_found))
@@ -271,20 +270,21 @@ class MyText:
         if self.badwords is None:
             badwords_matcher = LexiconMatcher(lexicon=default_config.badwords_LDNOOBW)
             badwords_found = badwords_matcher.get_matches(tokens=self.tokens, return_indexes=True, ignore_case=True) #search_badwords_tokens_greedy(badwords_list=default_config.badwords_LDNOOBW, tokens=self.tokens, ignore_case=True)
-            badwords_features = list(map(lambda w: MyFeature(
+            badwords_features = list(map(lambda w: TextualFeature(
                 feature_type=default_config.single_feature_names_dict[default_config.default_badwords_colname], 
                 feature_value=w[2], position_in_text=w[0] ),
                                          badwords_found ))
             setattr(self, default_config.default_badwords_colname, badwords_features)
         if self.uppercaseWords is None:
             uppercase_found = [(p,t) for p,t in enumerate(self.tokens) if is_upper_word(t)]
-            uppercase_features = list(map(lambda w: MyFeature(
+            uppercase_features = list(map(lambda w: TextualFeature(
                 feature_type=default_config.single_feature_names_dict[default_config.default_uppercase_words_colname], 
                 feature_value=w[1], position_in_text=w[0] ),
                                          uppercase_found))
             setattr(self, default_config.default_uppercase_words_colname, uppercase_features)
         self.__map_index_to_features__()
         self.is_processed=True
+        self.get_sentences()
         return self
     
     
@@ -303,29 +303,29 @@ class MyText:
         
     def add_feature(self, feature_name: str, feature_values: Sequence[dict]=None) -> None:
         """
-        Adds a new feature to the MyText
+        Adds a new feature to this TexTractor instance
         
         :param feature_name: The name of the feature to add
-        :param feature_values: I valori della feature da assegnare (opzionale, default è None).
+        :param feature_values: optional. The values of the feature (must be in the form of 
         """
-        # Verifica che il nome della feature sia valido (solo lettere, numeri e _)
-        if not re.match(r'^[A-Za-z_][A-Za-z0-9_]*$', feature_name):
-            raise ValueError("Il nome della feature deve essere un identificatore valido (alfa-numerico e '_').")
+        # Checks that the feature name is valid (only numbers, letters, underscores, no spaces in between)
+        if not re.match(r'^[a-zA-Z0-9]+(?:_[a-zA-Z0-9]+)*$', feature_name):
+            raise ValueError("The name of the new feature must be a single token string composed by alphanumeric chars only, eventually separated through '_'")
         if feature_name in vars(self):
             raise ValueError('Feature {} already exists'.format(feature_name))
         if feature_name in ['match_start', 'match_end', 'position_in_text', 'replacement_string']:
             raise ValueError('Invalid feature name')
-        # Assegna i valori della feature (default a una lista vuota se None)
+        # Validates feature values (if feature_values is None, will assign an empty list as values)
         if feature_values is not None:
             
-            feature_values = [curr_dict_to_feature(v, feature_name_key=feature_name) 
+            feature_values = [dict_to_TextualFeature(v, feature_name_key=feature_name) 
                               if isinstance(v, dict) 
-                              else MyFeature(feature_type=feature_name, feature_value=v)
+                              else TextualFeature(feature_type=feature_name, feature_value=v)
                              for v in feature_values]
         else:
             feature_values = []
         
-        # Aggiungi l'attributo all'oggetto MyText
+        # Adds the current feature to the TexTractor instance
         setattr(self, feature_name, feature_values)
         self._features_names_.append(feature_name)
     
@@ -339,8 +339,8 @@ class MyText:
             return
         return getattr(self, key)
     
-    def copy(self) -> "MyText":
-        return MyText(self)
+    def copy(self) -> "TexTractor":
+        return TexTractor(self)
     
     def apply(self, func):
         """Applies any function to the current text attribute"""
@@ -348,17 +348,17 @@ class MyText:
     
     def to_pandas_row(self) -> pd.Series:
         """
-        Converte l'oggetto MyText in una riga di un DataFrame.
-        Restituisce un pandas Series con i nomi degli attributi come colonne e i rispettivi valori come valori.
+        Converts the current TexTractor instance to a pandas DataFrame row.
+        Returns a pandas Series having as columns the feature_names and as values the features_values for each feature type
         """
-        # Crea un dizionario con i nomi degli attributi e i relativi valori, escludendo attributi speciali
+        #Only builds columns for features names attribute, by excluding attributes such as self.tokenizer etc
         data = {attr:v for attr,v in vars(self).items() if not attr.startswith('_') and attr not in ['tokenizer', 'is_processed']}
-        # Restituisce un pandas Series (una singola riga di DataFrame)
+        
         return pd.Series(data)
         ##self.map(lambda t: vars(t)).apply(pd.Series)
 
 
-    def get_urls(self, values_only=False) -> list[MyFeature]:
+    def get_urls(self, values_only=False) -> list[TextualFeature]:
         if not self.is_processed:
             self.process()
         if values_only:
@@ -366,7 +366,7 @@ class MyText:
             return list(map(lambda feat: feat[url_name], getattr(self, default_config.default_urls_colname)))
         return getattr(self, default_config.default_urls_colname)
 
-    def get_emojis(self, values_only=False) -> list[MyFeature]:
+    def get_emojis(self, values_only=False) -> list[TextualFeature]:
         if not self.is_processed:
             self.process()
         if values_only:
@@ -374,7 +374,7 @@ class MyText:
             return list(map(lambda feat: feat[emoj_name], getattr(self, default_config.default_emojis_colname)))
         return getattr(self, default_config.default_emojis_colname)
 
-    def get_emoticons(self, values_only=False) -> list[MyFeature]:
+    def get_emoticons(self, values_only=False) -> list[TextualFeature]:
         if not self.is_processed:
             self.process()
         if values_only:
@@ -382,7 +382,7 @@ class MyText:
             return list(map(lambda feat: feat[emot_name], getattr(self, default_config.default_emoticons_colname)))
         return getattr(self, default_config.default_emoticons_colname)
 
-    def get_mentions(self, values_only=False) -> list[MyFeature]:
+    def get_mentions(self, values_only=False) -> list[TextualFeature]:
         if not self.is_processed:
             self.process()
         if values_only:
@@ -390,7 +390,7 @@ class MyText:
             return list(map(lambda feat: feat[ment_name], getattr(self, default_config.default_mentions_colname)))
         return getattr(self, default_config.default_mentions_colname)
 
-    def get_repeated_punctuations(self, values_only=False) -> list[MyFeature]:
+    def get_repeated_punctuations(self, values_only=False) -> list[TextualFeature]:
         if not self.is_processed:
             self.process()
         if values_only:
@@ -398,7 +398,7 @@ class MyText:
             return list(map(lambda feat: feat[rep_punct_name], getattr(self, default_config.default_repeated_punctuation_colname)))
         return getattr(self, default_config.default_repeated_punctuation_colname)
 
-    def get_hashtags(self, values_only=False) -> list[MyFeature]:
+    def get_hashtags(self, values_only=False) -> list[TextualFeature]:
         if not self.is_processed:
             self.process()
         return getattr(self, default_config.default_hashtags_colname)
@@ -407,7 +407,7 @@ class MyText:
             return list(map(lambda feat: feat[hasht_name], getattr(self, default_config.default_hashtags_colname)))
         return getattr(self, default_config.default_hashtags_colname)
 
-    def get_badwords(self, values_only=False) -> list[MyFeature]:
+    def get_badwords(self, values_only=False) -> list[TextualFeature]:
         if not self.is_processed:
             self.process()
         return getattr(self, default_config.default_badwords_colname)
@@ -416,7 +416,7 @@ class MyText:
             return list(map(lambda feat: feat[badw_name], getattr(self, default_config.default_badwords_colname)))
         return getattr(self, default_config.default_badwords_colname)
     
-    def get_uppercase_words(self, values_only=False) -> list[MyFeature]:
+    def get_uppercase_words(self, values_only=False) -> list[TextualFeature]:
         if not self.is_processed:
             self.process()
         return getattr(self, default_config.default_uppercase_words_colname)
@@ -449,6 +449,9 @@ class MyText:
         return self.tokens
 
     def __get_sentences_split_punctuation__(self) -> list[str]:
+        """
+        Sets multiple punctuation string to its first punctuation character (e.g. from !11!??! to !) in order to have better sentences splits!
+        """
         punctuation_features = [f.copy() for f in self.__get_sorted_features__(features=default_config.default_repeated_punctuation_colname)]
         if not punctuation_features:
             if self.sentences is None:
@@ -462,8 +465,6 @@ class MyText:
 
     def get_sentences(self, ) -> list[str]:
         sanitize_multiple_punctuation: bool = True #to improve the logic here -> should we use it by default?
-        ###finora viene ignorato se self.sentences è  già stata avvalorata. in maniera da evitare di processare sent_tokenize() per ogni chiamata
-        ###ma così facendo ovviamente se sanitize_multiple_punctuation era False alla prima call, non verranno mai estratte le sentences con repeated_punct "rimossa"
         if self.sentences is None:
             self.sentences = sent_tokenize(self.text) if not sanitize_multiple_punctuation else self.__get_sentences_split_punctuation__()
         return self.sentences
@@ -490,7 +491,7 @@ class MyText:
                 curr_tokens = self.tokens[curr_offset:]
 
     
-    def __get_sorted_features__(self, features=None) -> list[MyFeature]:
+    def __get_sorted_features__(self, features=None) -> list[TextualFeature]:
         if not self.is_processed:
             self.process()
         if features is None:
@@ -510,11 +511,10 @@ class MyText:
 
     
 
-def dict_to_My_Feature(curr_dict: dict, feature_name_key: str = None) -> MyFeature:
+def dict_to_TextualFeature(curr_dict: dict, feature_name_key: str = None) -> TextualFeature:
     try:
-        return MyFeature(**curr_dict)
+        return TextualFeature(**curr_dict)
     except:
-        print('a')
         curr_dict = curr_dict.copy()
         if feature_name_key is None:
             feature_name_key = [k for k in curr_dict.keys() if k in default_config.single_feature_names_dict.values()]
@@ -523,9 +523,10 @@ def dict_to_My_Feature(curr_dict: dict, feature_name_key: str = None) -> MyFeatu
             else:
                 feature_name_key = feature_name_key[0]
 
-
+        print(feature_name_key)
+        print(curr_dict)
         feature_value = curr_dict.pop(feature_name_key)
 
         new_dict = {'feature_type': feature_name_key,
                    'feature_value': feature_value}
-        return MyFeature(dict(**new_dict, **curr_dict))
+        return TextualFeature(dict(**new_dict, **curr_dict))
