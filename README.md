@@ -2,7 +2,7 @@
 Reddit-specific NLP pipeline with tailored preprocessing, combined syntactic/semantic/lexical feature extraction, structured multi-run training/prediction, and full resume support.
 
 
-# Reddit NLP Pipeline
+## Reddit NLP Pipeline
 
 A modular, extensible NLP pipeline focused on Reddit data, combining specialized preprocessing, multi-level feature extraction, and structured handling of multi-run training and prediction workflows.
 
@@ -12,6 +12,7 @@ This project implements:
 
 - A Reddit-specific preprocessing pipeline tailored to the linguistic and structural peculiarities of Reddit posts and comments.
 - A flexible feature extraction system that combines:
+  - **Reddit and online social media textual features** (mentions, hashtags, emojis, emoticons, exclamation marks, UPPER words and so on) - which are handled as individual tokens!
   - **Lexical features** (e.g., token frequencies, n-grams)
   - **Syntactic features** (e.g., POS tagging, dependency parsing)
   - **Semantic features** (e.g., embeddings, sentiment, topic distributions)
