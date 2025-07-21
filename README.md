@@ -70,5 +70,5 @@ categories = [...]
 train(texts=texts, categories=categories, batch_size=5000, saving_directory=io_utils.DEFAULT_MODELS_PATH.joinpath('new_model'))
 
 texts2 = ...
-predict(texts=texts2, io_utils.DEFAULT_MODELS_PATH.joinpath('new_model'), save=False) #PREDICTIONS FROM ALREADY TRAINED MODEL
+predict(texts=texts2, model_dir=io_utils.DEFAULT_MODELS_PATH.joinpath('new_model'), save=False) #PREDICTIONS FROM ALREADY TRAINED MODEL
 ```
