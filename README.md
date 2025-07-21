@@ -26,19 +26,20 @@ This project implements:
 The following example demonstrates how to process a single text and extract various features from it:
 
 ```python
-from my_module import MyText
+from text_processing.textractor import TexTractor
 
 # Example Reddit text
-t = MyText("This is a  text from r/Reddit and it's amazing! emoji emoji Try it out :) #reddit www.reddit.com")
+t = TexTractor("This is a r/reddit text and it's amazing! 😀 emoji emoji Try it out 🚀 #reddit www.reddit.com")
 
-# Process the text
+
+# Process the text to extract all features
 t.process()
 
-# Get emoticons from the text
-emoticons = t.get_emoticons()
-print(emoticons)
-emojis = t.get_emojis()
+# Get features from the text
 mentions = t.get_mentions()
+print(mentions) ## will print ['r/reddit', feature_type: 'mention']
+emojis = t.get_emojis() ## will contain ['😀', '🚀']
+
 
 # Get all features from the processed text
 t.get_all_features()
