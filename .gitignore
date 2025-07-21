@@ -5,6 +5,10 @@ __pycache__/
 rundata/*
 !rundata/models/
 rundata/models/*
-!rundata/models/horizontal/
-!rundata/models/vertical/
-!rundata/models/global
+!rundata/models/.default/
+rundata/models/.default/*
+!rundata/models/.default/model.joblib
+!rundata/models/.default/scaler.joblib
+!rundata/models/.default/tfidf_extractor.joblib
+
+!rundata/models/horizontal/whole/no_undersampling/grid_search_rf.joblib

@@ -55,7 +55,7 @@ def predict(texts=None , model_dir=None, resume_dir=False, save=False, batch_siz
     texts = pd.Series(__validate_text_input__(texts), name='text')
     
     if model_dir is None:
-        model_dir = io_utils.STANDARD_MODEL_PATH
+        model_dir = str(io_utils.STANDARD_MODEL_PATH)
     else:
         model_dir = io_utils.validate_existing_model_dir(model_dir)
     print(f'Curr model directory: {model_dir}')
