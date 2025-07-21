@@ -44,4 +44,31 @@ emojis = t.get_emojis() ## will contain ['😀', '🚀']
 # Get all features from the processed text
 t.get_all_features()
 ```
+### Example 2: Feature extraction
 
+```python
+from features_extraction_and_classification.feature_extraction import extract_features
+
+# Collection of Reddit texts
+texts = collection_of_texts
+
+# Define saving directory
+saving_directory = "/path/to/save/features"
+
+# Extract features in batches
+extract_features(texts, batch_size=100, saving_directory=saving_directory)
+```
+
+### Example 3: Training model from raw texts
+
+```python
+from features_extraction_and_classification.main import train, predict
+from features_extraction_and_classification import io_utils as io_utils
+texts = collection_of_texts
+categories = [...]
+
+train(texts=texts, categories=categories, batch_size=5000, saving_directory=io_utils.DEFAULT_MODELS_PATH.joinpath('new_model'))
+
+texts2 = ...
+predict(texts=texts2, io_utils.DEFAULT_MODELS_PATH.joinpath('new_model'), save=False) #PREDICTIONS FROM ALREADY TRAINED MODEL
+```
