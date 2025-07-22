@@ -29,7 +29,7 @@ The following example demonstrates how to process a single text and extract vari
 from text_processing.textractor import TexTractor
 
 # Example Reddit text
-t = TexTractor("This is a r/reddit text and it's amazing! 😀 emoji emoji Try it out 🚀 #reddit www.reddit.com")
+t = TexTractor("This is a r/reddit text and it's amazing! 😀 Try it out 🚀 #reddit www.reddit.com")
 
 
 # Process the text to extract all features
