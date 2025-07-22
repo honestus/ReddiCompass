@@ -10,9 +10,9 @@ def do_nothing(tokens: list[str]) -> list[str]:
 
 def custom_tokenizer_ngram_extractor(text: str or list[str], stopwords: list[str] =[], ngram_range: tuple[int,int] =(1,1)) -> list[str] :
     """ Only builds ngrams from consecutive tokens, by avoiding ngrams that come from following tokens after stopword removal
-        E.G.: suppose text is 'tok1 tok_stopword tok3'... suppose we have ['tok1', 'tok_stopword', tok3'] as tokens.
+        E.G.: suppose text_tokens = ['tok1', 'tok_stopword', tok3'].
         After stopword removal we have ['tok1', 'tok3'] but when we build ngrams (n>1) we should avoid 'tok1 tok3', 
-        as they never appear consecutively in the text
+        as they never appear consecutively in the text.
     """
     if not isinstance(text, (list, np.ndarray, pd.Series)):
         words = text.split()

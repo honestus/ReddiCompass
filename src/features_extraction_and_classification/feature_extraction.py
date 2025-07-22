@@ -85,8 +85,9 @@ def __extract_textual_features_to_df__(texts):
     return textual_df
 
 def get_default_tfidf_extractor(ngram_range):
+    import features_extraction_and_classification.tfidf_utils as tfidf_utils
     tfidf_extractor = Pipeline([
-    ('vectorizer', CountVectorizer(tokenizer=do_nothing, preprocessor=do_nothing, ngram_range=ngram_range)),  # frequencies
+    ('vectorizer', CountVectorizer(tokenizer=tfidf_utils.do_nothing, preprocessor=tfidf_utils.do_nothing, ngram_range=ngram_range)),  # frequencies
     ('tfidf', TfidfTransformer()),  # tfidf
     ('kbest', SelectKBest(score_func=chi2, k=20)),
 ])
