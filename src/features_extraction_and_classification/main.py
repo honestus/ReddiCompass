@@ -4,7 +4,7 @@ import joblib
 from sklearn.preprocessing import LabelEncoder, MinMaxScaler
 from sklearn.feature_extraction.text import TfidfTransformer, CountVectorizer
 from sklearn.svm import LinearSVC
-from features_extraction_and_classification.feature_extraction import extract_features, get_tfidf_extractor, __validate_text_input__
+from features_extraction_and_classification.feature_extraction import extract_features, get_default_tfidf_extractor, __validate_text_input__
 import features_extraction_and_classification.io_utils as io_utils
 import features_extraction_and_classification.resume_utils as resume_utils
 from features_extraction_and_classification.resume_utils import validate_meta_file, store_meta_file
@@ -75,7 +75,7 @@ def predict(texts=None , model_dir=None, resume_dir=False, save=False, batch_siz
         
     else:
         saving_directory=False
-    features = extract_features(texts, tfidf_extractor=tfidf_extractor, fit_tfidf=False, batch_size=batch_size, saving_directory=saving_directory, overwrite=True)
+    features = extract_features(texts, extract_tfidf=True, tfidf_extractor=tfidf_extractor, fit_tfidf=False, batch_size=batch_size, saving_directory=saving_directory, overwrite=True)
     print('Features extracted correctly')
     if saving_directory and not resume_dir:
         meta_obj[resume_utils.FEATURES_ATTRIBUTE] = True
@@ -102,12 +102,6 @@ def train(texts, categories, resume_dir=False, batch_size=False, saving_director
     Also stores all of the extracted features, the input texts and the preprocessor objects (tfidfvectorizer, scaler).
     To avoid storing, use saving_directory=False
     """
-    def __check_x_y_shapes__(x, y):
-        if not isinstance(y, (list, np.ndarray, pd.Series)):
-            raise TypeError('categories must be a collection')
-        if len(x)!=len(y):
-            raise ValueError('Texts and categories must be of the same size to train the models')
-        return True
     
     if resume_dir:
         raise NotImplementedError('to do')
@@ -115,7 +109,7 @@ def train(texts, categories, resume_dir=False, batch_size=False, saving_director
             warnings.warnings('Texts and model_dir will be ignored as resuming from previously processed texts. If you want to predict new texts or with a different model, set resume to False')
         
     texts = __validate_text_input__(texts)
-    __check_x_y_shapes__(texts, categories)
+    texts, categories = __validate_x_y__(texts,categories)
    
     
     if saving_directory is None:
@@ -133,8 +127,8 @@ def train(texts, categories, resume_dir=False, batch_size=False, saving_director
             meta_obj[resume_utils.MODEL_DIR_ATTRIBUTE] = saving_directory
             meta_obj[resume_utils.NGRAM_RANGE_ATTRIBUTE] = ngram_range
             store_meta_file(meta_obj, saving_dir=saving_directory)
-    tfidf_extractor=get_tfidf_extractor(ngram_range=ngram_range)   
-    features = extract_features(texts, tfidf_extractor=tfidf_extractor, fit_tfidf=True, ngram_range=ngram_range, y=categories, batch_size=batch_size, 
+    tfidf_extractor=get_default_tfidf_extractor(ngram_range=ngram_range)   
+    features = extract_features(texts, extract_tfidf=True, tfidf_extractor=tfidf_extractor, fit_tfidf=True, ngram_range=ngram_range, y=categories, batch_size=batch_size, 
     saving_directory=saving_directory, overwrite=True)
     print('Features extracted correctly')
     if saving_directory and not resume_dir:
@@ -160,3 +154,72 @@ def train(texts, categories, resume_dir=False, batch_size=False, saving_director
     
     
     
+def __validate_x_y__(x, y, check_order=True):
+    
+    """
+    Verifies if two variables (x and y) have the same index, 
+    handling both Pandas collections (DataFrame, Series) and non-Pandas collections (lists, tuples).
+    
+    The function follows these rules:
+    
+    - If neither has an index (both are lists, tuples, etc.), return True.
+    - If only one of them has an index (Pandas object), raise a warning and reset the other to the default index.
+    - If both have indices, but the index names are different but values are the same, raise a warning and return True.
+    - If both have indices with different values, raise an error.
+    
+    Args:
+        x: Can be a Pandas DataFrame, Series, or any non-Pandas collection like a list or tuple.
+        y: Can be a Pandas DataFrame, Series, or any non-Pandas collection like a list or tuple.
+        
+    Returns:
+        bool: True if indices are the same (following the rules above), False otherwise.
+    
+    Raises:
+        ValueError: if the indices have different values.
+    """
+    def __check_x_y_shapes__(x, y):
+        if not isinstance(y, (list, np.ndarray, pd.Series)):
+            raise TypeError('categories must be a collection')
+        if len(x)!=len(y):
+            raise ValueError('Texts and categories must be of the same size to train the models')
+        return True
+    
+    def __check_equals_index_values__(x_index, y_index, check_order=True):
+        if check_order:
+            return x_index.equals(y_index)
+        return sorted(x_index)==sorted(y_index)
+    import warnings
+    
+    
+    if not __check_x_y_shapes__(x,y):
+        raise ValueError('Wronge shapes')
+    # Case when neither x nor y has an index (i.e., both are not Pandas collections)
+    if not isinstance(x, (pd.Series, pd.DataFrame)) and not isinstance(y, (pd.Series, pd.DataFrame)):
+        return x, y
+    
+    # Case when only one of them is a Pandas object with an index
+    if isinstance(x, (pd.Series, pd.DataFrame)) and not isinstance(y, (pd.Series, pd.DataFrame)):
+        warnings.warn("Only the x collection has an index. Resetting both to pandas series with default index to avoid misbehaviours.", UserWarning)
+        y = pd.Series(y)
+        x, y = x.reset_index(drop=True), y.reset_index(drop=True)
+        return x, y
+    
+    if not isinstance(x, (pd.Series, pd.DataFrame)) and isinstance(y, (pd.Series, pd.DataFrame)):
+        warnings.warn("Only the y collection has an index. Resetting both to pandas series with default index to avoid misbehaviours.", UserWarning)
+        x = pd.Series(x)
+        x, y = x.reset_index(drop=True), y.reset_index(drop=True)
+        return x, y
+    
+    # Case when both x and y are Pandas objects with indices
+    if isinstance(x, (pd.Series, pd.DataFrame)) and isinstance(y, (pd.Series, pd.DataFrame)):
+        if __check_equals_index_values__(x.index, y.index, check_order=check_order):
+            if x.index.names != y.index.names:
+                warnings.warn("Different index names for the x and y collections. Please ensure you are passing proper texts and categories", UserWarning) 
+            return x, y
+        
+        # If the indices are different, raise a ValueError
+        if not x.index.equals(y.index):
+            warnings.warn("The indices of x and y are different in values. Please ensure you are passing proper texts and categories", UserWarning)
+            x, y = x.reset_index(drop=True), y.reset_index(drop=True)
+        
+    return x,y

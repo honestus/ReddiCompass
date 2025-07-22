@@ -138,7 +138,7 @@ def extract_moral_foundations(texts) -> pd.DataFrame:
     frameaxis_df = frameaxis_df[['frameaxis_text']].reset_index()
     
     emfd_scores_clean_replacedmentions = fa.get_fa_scores(df=frameaxis_df, doc_colname='frameaxis_text', tfidf=False)
-    ind_name = 'index' if texts.index.name is None else texts.index.name
+    ind_name = 'index' if all(ind_name is None for ind_name in texts.index.names) else texts.index.names
     frameaxis_df = frameaxis_df.set_index(ind_name).drop('frameaxis_text',axis=1).\
                     join(emfd_scores_clean_replacedmentions.drop('frameaxis_text',axis=1).set_index(ind_name), how='left')#.fillna(0)
     del(emfd_scores_clean_replacedmentions)
