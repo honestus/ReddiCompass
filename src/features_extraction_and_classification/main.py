@@ -4,7 +4,7 @@ import joblib
 from sklearn.preprocessing import LabelEncoder, MinMaxScaler
 from sklearn.feature_extraction.text import TfidfTransformer, CountVectorizer
 from sklearn.svm import LinearSVC
-from features_extraction_and_classification.feature_extraction import extract_features, get_default_tfidf_extractor, __validate_text_input__
+from features_extraction_and_classification.feature_extraction import __extract_features_in_batches__, get_default_tfidf_extractor, __validate_text_input__
 import features_extraction_and_classification.io_utils as io_utils
 import features_extraction_and_classification.resume_utils as resume_utils
 from features_extraction_and_classification.resume_utils import validate_meta_file, store_meta_file
@@ -68,14 +68,16 @@ def predict(texts=None , model_dir=None, resume_dir=False, save=False, batch_siz
         pd.DataFrame(texts).to_parquet(saving_directory + f'/{io_utils.TEXTS_FILENAME}', index=True)
         if not resume_dir:
             meta_obj = {}
+            meta_obj[resume_utils.FUNCTION_ATTRIBUTE] = 'predict'
             meta_obj[resume_utils.NUMBER_OF_TEXTS_ATTRIBUTE] = len(texts)
             meta_obj[resume_utils.BATCH_SIZE_ATTRIBUTE] = batch_size
             meta_obj[resume_utils.MODEL_DIR_ATTRIBUTE] = model_dir
+            meta_obj[resume_utils.TFIDF_BOOL_ATTRIBUTE] = True
             store_meta_file(meta_obj, saving_dir=saving_directory)
-        
     else:
         saving_directory=False
-    features = extract_features(texts, extract_tfidf=True, tfidf_extractor=tfidf_extractor, fit_tfidf=False, batch_size=batch_size, saving_directory=saving_directory, overwrite=True)
+        
+    features = __extract_features_in_batches__(texts, extract_tfidf=True, tfidf_extractor=tfidf_extractor, fit_tfidf=False, batch_size=batch_size, saving_directory=saving_directory, overwrite=True)
     print('Features extracted correctly')
     if saving_directory and not resume_dir:
         meta_obj[resume_utils.FEATURES_ATTRIBUTE] = True
@@ -122,13 +124,16 @@ def train(texts, categories, resume_dir=False, batch_size=False, saving_director
         pd.DataFrame({'text':texts, 'cat':categories}).to_parquet(saving_directory + f'/{io_utils.TEXTS_FILENAME}', index=True)
         if not resume_dir:
             meta_obj = {}
+            meta_obj[resume_utils.FUNCTION_ATTRIBUTE] = 'train'
             meta_obj[resume_utils.NUMBER_OF_TEXTS_ATTRIBUTE] = len(texts)
             meta_obj[resume_utils.BATCH_SIZE_ATTRIBUTE] = batch_size
             meta_obj[resume_utils.MODEL_DIR_ATTRIBUTE] = saving_directory
             meta_obj[resume_utils.NGRAM_RANGE_ATTRIBUTE] = ngram_range
+            meta_obj[resume_utils.TFIDF_BOOL_ATTRIBUTE] = True
             store_meta_file(meta_obj, saving_dir=saving_directory)
+   
     tfidf_extractor=get_default_tfidf_extractor(ngram_range=ngram_range)   
-    features = extract_features(texts, extract_tfidf=True, tfidf_extractor=tfidf_extractor, fit_tfidf=True, ngram_range=ngram_range, y=categories, batch_size=batch_size, 
+    features = __extract_features_in_batches__(texts, extract_tfidf=True, tfidf_extractor=tfidf_extractor, fit_tfidf=True, ngram_range=ngram_range, y=categories, batch_size=batch_size, 
     saving_directory=saving_directory, overwrite=True)
     print('Features extracted correctly')
     if saving_directory and not resume_dir:

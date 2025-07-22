@@ -175,14 +175,14 @@ def validate_new_dir(new_dir: str, force_to_default_path: bool = True, funct = N
 
     if new_dir.exists():
         if funct == 'extract_features' and overwrite:
-            # Remove only features*.parquet
+            # Remove all already existing features/tokens files from new_dir
             all_features_filepaths = [Path(f) for f in get_stored_features_files(new_dir)] + [Path(f) for f in get_stored_tokens_files(new_dir)]
             for f in all_features_filepaths:
                 f.unlink()
         else:
             # For train/predict OR extract_features without overwrite
             raise FileExistsError(f"Directory '{new_dir}' already exists. "
-                                  f"Use overwrite=True if you intend to clear features files (extract_features only).")
+                                  f"Use overwrite=True if you intend to clear existing features files and saving new ones.")
 
     return str(new_dir)
 

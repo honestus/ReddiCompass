@@ -228,17 +228,17 @@ already_processed_tokens=None, **kwargs):
     
     return features
 
-def extract_features(text, extract_tfidf: bool, tfidf_extractor: sklearn.base.BaseEstimator = None, fit_tfidf: bool = False, saving_directory: str = False, overwrite: bool = False, resume_mode: bool = False, **kwargs):
+def extract_features(texts, extract_tfidf: bool, tfidf_extractor: sklearn.base.BaseEstimator = None, fit_tfidf: bool = False, saving_directory: str = False, overwrite: bool = False, resume_mode: bool = False, **kwargs):
     from features_extraction_and_classification.io_utils import prepare_new_directory
     #from pathlib import Path
-    text = pd.Series(__validate_text_input__(text))
+    texts = pd.Series(__validate_text_input__(texts))
     batch_size = kwargs.pop("batch_size", False)
-    batch_size = len(text) + 1 if not batch_size else batch_size
+    batch_size = len(texts) + 1 if not batch_size else batch_size
     if saving_directory:
         if not resume_mode:
             prepare_new_directory(base_dir=saving_directory, force_to_default_path=False, funct='extract_features', overwrite=overwrite)
             #Path(saving_directory).mkdir(exist_ok=overwrite, parents=True) ###TO IMPROVE!!! Should be mkdir(exist_ok=True) if calling_funct is train/predict... otherwise prepare_new_directory
-    features = __extract_features_in_batches__(texts=text, extract_tfidf=extract_tfidf, tfidf_extractor=tfidf_extractor, fit_tfidf=fit_tfidf, saving_directory=saving_directory, batch_size=batch_size, **kwargs)
+    features = __extract_features_in_batches__(texts=texts, extract_tfidf=extract_tfidf, tfidf_extractor=tfidf_extractor, fit_tfidf=fit_tfidf, saving_directory=saving_directory, batch_size=batch_size, **kwargs)
     return features
         
 def _extract_features_old_(text, tfidf_extractor, fit_tfidf, **kwargs):

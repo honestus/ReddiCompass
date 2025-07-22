@@ -15,13 +15,15 @@ FEATURES_ATTRIBUTE = 'features'
 SCALER_ATTRIBUTE = 'scaler'
 MODEL_ATTRIBUTE = 'model'
 PREDICTIONS_ATTRIBUTE = 'predictions'
+FUNCTION_ATTRIBUTE = 'funct'
+TFIDF_BOOL_ATTRIBUTE = 'extract_tfidf'
 
-
+__all_possible_funct_resume__ = ["train", 'predict', "extract_features"]
 
 def __validate_funct__(funct):
-    if funct in ["train", 'predict']:
+    if funct in __all_possible_funct_resume__:
         return funct
-    raise ValueError("Funct must be either 'train' or 'predict'")
+    raise ValueError(f"Funct must be be one of: {__all_possible_funct_resume__}")
 
 
 def __load_meta_file__(meta_filepath):
@@ -35,27 +37,36 @@ def store_meta_file(dict_obj, saving_dir, filename=META_FILENAME):
         return True
     return False
 
-def _is_valid_meta_dict_(meta_dict, funct:str) -> bool:
-    required_common = [NUMBER_OF_TEXTS_ATTRIBUTE, BATCH_SIZE_ATTRIBUTE]
+def get_required_meta_params(funct):
+    funct = __validate_funct__(funct)
+    required = [NUMBER_OF_TEXTS_ATTRIBUTE, BATCH_SIZE_ATTRIBUTE, FUNCTION_ATTRIBUTE]
+    if funct=='train':
+        return required + [NGRAM_RANGE_ATTRIBUTE]
+    if funct=='predict':
+        return required + [MODEL_DIR_ATTRIBUTE]
+    if funct=='extract_features':
+        return required + [TFIDF_BOOL_ATTRIBUTE]
+    return required
 
-    if funct == "train":
-        required = [NGRAM_RANGE_ATTRIBUTE]
-    elif funct == "predict":
-        required = [MODEL_DIR_ATTRIBUTE]
-    else:
-        raise ValueError("'funct' must be either 'train' or 'predict'")
-    required = set(required + required_common)
+def _is_valid_meta_dict_(meta_dict) -> bool:
+    required_common = [NUMBER_OF_TEXTS_ATTRIBUTE, BATCH_SIZE_ATTRIBUTE, FUNCTION_ATTRIBUTE]
+    
+    funct = meta_dict.get(FUNCTION_ATTRIBUTE, -1)
+    if funct==-1:
+        raise ValueError(f"'{FUNCTION_ATTRIBUTE}' not defined")
+    
+    required = get_required_meta_params(funct=funct)
     missing_in_meta = [k for k in required if k not in meta_dict]
     if any(missing_in_meta):
         raise ValueError(f'Meta file does not contain all the needed info. Missing: {missing_in_meta}')
     return True
 
-def validate_meta_file(meta_filepath: str | Path, funct: str) -> bool:
+def validate_meta_file(meta_filepath: str | Path) -> bool:
     meta_filepath = Path(meta_filepath)
     if not meta_filepath.exists():
         raise FileNotFoundError(f"Cannot find meta.json file at the specified resume directory. Impossible to resume.")
     meta = __load_meta_file__(meta_filepath)
-    if _is_valid_meta_dict_(meta, funct=funct):
+    if _is_valid_meta_dict_(meta):
         if NGRAM_RANGE_ATTRIBUTE in meta:
             meta[NGRAM_RANGE_ATTRIBUTE] = tuple(meta[NGRAM_RANGE_ATTRIBUTE])
         return meta
@@ -140,9 +151,9 @@ def is_scaler_finished(resume_dir):
     
    
     
-def extract_features_resume(resume_dir, funct):
-    import io_utils
-    from features_extraction_and_classification.feature_extraction import extract_features, get_tfidf_extractor
+def extract_features_resume(resume_dir):
+    import features_extraction_and_classification.io_utils as io_utils
+    from features_extraction_and_classification.feature_extraction import __extract_features_in_batches__, get_default_tfidf_extractor
     if not is_valid_resume_dir(resume_dir):
         raise ValueError('Cannot resume from chosen resume directory')
     resume_dir = Path(resume_dir)
@@ -152,36 +163,36 @@ def extract_features_resume(resume_dir, funct):
         return processed_features
     processed_tokens = get_processed_tfidf_tokens(resume_dir)
     
-    funct = __validate_funct__(funct)
-    meta = validate_meta_file(Path(resume_dir).joinpath(META_FILENAME), funct=funct)
+    meta = validate_meta_file(Path(resume_dir).joinpath(META_FILENAME))
     model_dir = meta[MODEL_DIR_ATTRIBUTE]
     batch_size = meta[BATCH_SIZE_ATTRIBUTE]
     total_texts = meta[NUMBER_OF_TEXTS_ATTRIBUTE]
+    funct = meta[FUNCTION_ATTRIBUTE]
     #processed_batches = meta["processed_batches"]
     
     if funct=='train':
         ngram_range = meta[NGRAM_RANGE_ATTRIBUTE]
-        tfidf_extractor=get_tfidf_extractor(ngram_range=ngram_range)
+        tfidf_extractor=get_default_tfidf_extractor(ngram_range=ngram_range)
     elif funct=='predict':
         tfidf_extractor = io_utils.load_model(model_dir + f'/{io_utils.TFIDF_EXTRACTOR_FILENAME}')
 
     if processed_tokens.empty or processed_features.empty:        
         if funct=='train':
-            return extract_features(text=orig_texts['text'], y=orig_texts['cat'], batch_size=batch_size, 
+            return __extract_features_in_batches__(texts=orig_texts['text'], y=orig_texts['cat'], batch_size=batch_size, 
         tfidf_extractor=tfidf_extractor, fit_tfidf=True, ngram_range=ngram_range,
         saving_directory=str(resume_dir), overwrite=True, resume_mode=True)
         elif funct=='predict':
-            return extract_features(text=orig_texts['text'], tfidf_extractor=tfidf_extractor, fit_tfidf=False, 
+            return __extract_features_in_batches__(texts=orig_texts['text'], tfidf_extractor=tfidf_extractor, fit_tfidf=False, 
             batch_size=batch_size, saving_directory=str(resume_dir), overwrite=True, resume_mode=True)
         else:
-            raise ValueError('')
+            raise NotImplementedError('')
     
     curr_features_files =  get_stored_features_files(resume_dir, return_whole_file=False)
     curr_tokens_files =  get_stored_tokens_files(resume_dir, return_whole_file=False)
     features_files_indexes = [int(Path(f).stem.split(Path(FEATURES_FILENAME).stem+'_')[-1]) for f in curr_features_files]
     tokens_files_indexes = [int(Path(f).stem.split(Path(TFIDF_TOKENS_FILENAME).stem+'_')[-1]) for f in curr_tokens_files]
     
-    if sorted(processed_features.index) != sorted(processed_tokens.index):
+    if sorted(processed_features.index) != sorted(processed_tokens.index): ###Checking that features and tokens belong to the same texts objects
         common_processed_texts_idx = processed_features.index.intersection(processed_tokens.index) ##getting processed texts for both features and tfidftokens
         processed_features = processed_features.loc[common_processed_texts_idx]
         processed_tokens = processed_tokens.loc[common_processed_texts_idx]
@@ -201,7 +212,8 @@ def extract_features_resume(resume_dir, funct):
 
     print(f"Resuming features extraction --- Last saved index: {max(saved_indexes_filenames)}")
     if funct=='train':
-        return extract_features(text=unprocessed_texts['text'], y=orig_texts['cat'], 
+        return __extract_features_in_batches__(texts=unprocessed_texts['text'], y=orig_texts['cat'], 
+        extract_tfidf=True,
         tfidf_extractor=tfidf_extractor, 
         fit_tfidf=True, 
         ngram_range=ngram_range,
@@ -212,8 +224,9 @@ def extract_features_resume(resume_dir, funct):
         already_processed_tokens = processed_tokens[processed_tokens.columns[0]],
         resume_mode=True)
     if funct=='predict':
-        return extract_features(
-            text=unprocessed_texts['text'],
+        return __extract_features_in_batches__(
+            texts=unprocessed_texts['text'],
+            extract_tfidf=True,
             tfidf_extractor = tfidf_extractor,
             fit_tfidf=False,
             saving_directory=str(resume_dir),
