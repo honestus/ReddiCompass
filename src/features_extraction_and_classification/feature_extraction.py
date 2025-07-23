@@ -1,6 +1,5 @@
 import pandas as pd
 import numpy as np
-from nltk.corpus import wordnet
 import default_config
 import features_extraction_and_classification.default_resources as default_resources
 from text_processing.text_utils import get_wordnet_pos
@@ -8,9 +7,7 @@ from text_processing.textractor import TexTractor
 from text_processing.text_replacement import replace_features_in_text
 from text_processing.LexiconMatcher import LexiconMatcher
 from features_extraction_and_classification.contextual_features_extraction import *
-from sklearn.feature_extraction.text import TfidfTransformer, CountVectorizer
-from sklearn.feature_selection import SelectKBest, chi2
-from sklearn.pipeline import Pipeline
+
 from features_extraction_and_classification.tfidf_utils import do_nothing
 import warnings, sklearn
 
@@ -19,7 +16,7 @@ def __fillna__(feature_series, training_set):
         return 0
     return feature_series.fillna(training_set[feature_series.name].mean())
 
-def map_emojis_to_count(emojis_series, include_positive_and_negative=True):
+def _map_emojis_to_count(emojis_series, include_positive_and_negative=True):
     if not include_positive_and_negative:
         return emojis_series.map(lambda x: len(x))
     emojis_counts = pd.json_normalize(emojis_series\
@@ -32,7 +29,7 @@ def map_emojis_to_count(emojis_series, include_positive_and_negative=True):
     emojis_counts['emojis_count'] = emojis_counts['positive_emojis_count']+emojis_counts['negative_emojis_count']+emojis_counts['neutral_emojis_count']
     return emojis_counts
 
-def map_emoticons_to_count(emoticons_series, include_positive_and_negative=True):
+def _map_emoticons_to_count(emoticons_series, include_positive_and_negative=True):
     if not include_positive_and_negative:
         return emoticons_series.map(lambda x: len(x))
     emoticons_counts = pd.json_normalize(emoticons_series\
@@ -46,7 +43,8 @@ def map_emoticons_to_count(emoticons_series, include_positive_and_negative=True)
     return emoticons_counts
 
 
-def map_tags_to_count(tags_series, normalize=False):
+def _map_tags_to_count(tags_series, normalize=False):
+    from nltk.corpus import wordnet
     tags_counts = pd.json_normalize(tags_series.map(lambda tags: [get_wordnet_pos(tag) for word,tag in tags])\
                                        .map(lambda tags: {tag: tags.count(tag) for tag in [wordnet.NOUN, wordnet.ADJ, wordnet.VERB, wordnet.ADV]}))\
                         .rename({
@@ -84,21 +82,48 @@ def __extract_textual_features_to_df__(texts):
     textual_df = texts.map(lambda t: __extract_textual_features_single_text__(t).to_pandas_row()).apply(pd.Series)
     return textual_df
 
-def get_default_tfidf_extractor(ngram_range):
+def get_default_tfidf_extractor(ngram_range: tuple[int,int]=None, top_k: int=None):
+    from sklearn.feature_extraction.text import TfidfTransformer, CountVectorizer
+    from sklearn.feature_selection import SelectKBest, chi2
+    from sklearn.pipeline import Pipeline
     import features_extraction_and_classification.tfidf_utils as tfidf_utils
-    tfidf_extractor = Pipeline([
-    ('vectorizer', CountVectorizer(tokenizer=tfidf_utils.do_nothing, preprocessor=tfidf_utils.do_nothing, ngram_range=ngram_range)),  # frequencies
-    ('tfidf', TfidfTransformer()),  # tfidf
-    ('kbest', SelectKBest(score_func=chi2, k=20)),
-])
-    return tfidf_extractor
-
-def extract_tfidf_matrix(tokenized_corpus, y=None, fit=False, tfidf_extractor=None, ngram_range=(1,1), to_df=False, **kwargs):
+    if ngram_range is None:
+        ngram_range=(1,1)
+    if top_k is None:
+        top_k=20
+    
+    if top_k and isinstance(top_k, int):
+        tfidf_extractor = Pipeline([
+        ('vectorizer', CountVectorizer(tokenizer=tfidf_utils.do_nothing, preprocessor=tfidf_utils.do_nothing, ngram_range=ngram_range)),  # frequencies
+        ('tfidf', TfidfTransformer()),  # tfidf
+        ('kbest', SelectKBest(score_func=chi2, k=top_k)),
+    ])
+        return tfidf_extractor
+    elif top_k is False:
+        raise NotImplementedError('Pipeline without chi-square, might be interesting for some purposes')
+        tfidf_extractor = Pipeline([
+        ('vectorizer', CountVectorizer(tokenizer=tfidf_utils.do_nothing, preprocessor=tfidf_utils.do_nothing, ngram_range=ngram_range)),  # frequencies
+        ('tfidf', TfidfTransformer()),  # tfidf
+    ])
+    raise ValueError('wrong top_k')
+def build_tfidf_matrix(tokenized_corpus, y=None, fit=False, tfidf_extractor=None, ngram_range=None, top_k=None, to_df=False, **kwargs):
+    """
+    Please notice that input MUST be already tokenized to work properly. 
+    If you are trying to pass untokenized texts or using default tokenizer with tokenized corpus, it's very likely it will throw errors.
+    If you want to use default vectorizers , try to detokenize input text before passing it to tfidf_extractor, but you will likely lose 
+    much information from tokens such as emojis, mentions etc.
+    """
     if tfidf_extractor is None:
-        tfidf_extractor=get_default_tfidf_extractor(ngram_range=ngram_range)   
+        tfidf_extractor=get_default_tfidf_extractor(ngram_range=ngram_range, top_k=top_k)   
+    elif (not ngram_range is None) or (not top_k is None):
+        warnings.warnings("'ngram_range' and 'top_k' parameters are not considered when tfidf_extractor is passed. Use tfidf_extractor=None if you want to build a new tfidf_extractor with different 'ngram_range'/'top_k' parameters.")
+    print(tokenized_corpus)
+    if not y is None:
+        print(y)
+    print(tfidf_extractor)
     if fit:
-        if y is None:
-            raise ValueError('No y to fit tfidf extractor. Categories are needed since tf-idf is calculated only on top N features, by using chi-square selection.')
+        if top_k and y is None:
+            raise ValueError('No y to fit tfidf extractor. Categories are needed to select top-k discriminant tokens. Use top_k=False if you want to extract tf-idf of each token or include categories of texts.')
         tfidf_matrix = tfidf_extractor.fit_transform(tokenized_corpus, y=y)
     else:
         tfidf_matrix = tfidf_extractor.transform(tokenized_corpus)
@@ -142,9 +167,9 @@ def __extract_no_tfidf_features__(text, append_return_filtered_tokens=False):
     populism_df = pd.json_normalize(texts_with_emos.map(extract_populism)).set_index(texts_with_emos.index)
     
     #Mapping textual features to counts in BOW style - Normalizing by number of tokens
-    pos_tags_counts = map_tags_to_count(tagged_tokens, normalize=True)
-    emojis_counts = map_emojis_to_count(textual_df.emojis)
-    emoticons_counts = map_emoticons_to_count(textual_df.emoticons)
+    pos_tags_counts = _map_tags_to_count(tagged_tokens, normalize=True)
+    emojis_counts = _map_emojis_to_count(textual_df.emojis)
+    emoticons_counts = _map_emoticons_to_count(textual_df.emoticons)
     counts_df = pd.concat([entities_df, emojis_counts, emoticons_counts,
                            textual_df[['urls','mentions','repeatedPunctuation','hashtags','badwords','uppercaseWords', 'tokens', 'sentences']].map(lambda c: len(c)).rename(lambda c: c+'_count',axis=1)
                           ], axis=1, ignore_index=False)
@@ -164,25 +189,27 @@ def __extract_no_tfidf_features__(text, append_return_filtered_tokens=False):
     
     
 def extract_no_tfidf_features(text):
-    return __extract_no_tfidf_features__[0]
+    return __extract_no_tfidf_features__(text, append_return_filtered_tokens=False)[0]
 
-def __extract_features_in_batches__(texts, batch_size: int, extract_tfidf: bool, 
+def _extract_features_in_batches(texts, batch_size: int, extract_tfidf: bool, 
 tfidf_extractor: sklearn.base.BaseEstimator = None, fit_tfidf: bool = False, 
-saving_directory: str = False, already_processed_features=None,
-already_processed_tokens=None, **kwargs):
+saving_directory: str = False, already_processed_features_batches=None,
+already_processed_tokens_batches=None, **kwargs):
     import os, features_extraction_and_classification.io_utils as io_utils
         
     if extract_tfidf and fit_tfidf and ('y' not in kwargs):
         raise ValueError('Must pass categories through the "y" variable to fit tfidf_extractor')
+    if extract_tfidf and not fit_tfidf and (tfidf_extractor is None or not isinstance(tfidf_extractor, sklearn.base.BaseEstimator)):
+            raise ValueError('Must pass a valid tfidf_extractor to extract tf-idf vectors') 
     features, tfidf_tokens = pd.DataFrame(), pd.Series(name='tokens')
-    if already_processed_features is not None:
-        if not isinstance(already_processed_features, pd.DataFrame):
-            raise ValueError("Wrong type for 'already_processed_features'. It must be a pandas DataFrame")
-        features = pd.DataFrame(already_processed_features)
-    if already_processed_tokens is not None:
-        if not isinstance(already_processed_tokens, pd.Series):
-            raise ValueError("Wrong type for 'already_processed_tokens'. It must be a pandas Series")
-        tfidf_tokens = already_processed_tokens.rename('tokens')
+    if already_processed_features_batches is not None:
+        if not isinstance(already_processed_features_batches, pd.DataFrame):
+            raise ValueError("Wrong type for 'already_processed_features_batches'. It must be a pandas DataFrame")
+        features = pd.DataFrame(already_processed_features_batches)
+    if already_processed_tokens_batches is not None:
+        if not isinstance(already_processed_tokens_batches, pd.Series):
+            raise ValueError("Wrong type for 'already_processed_tokens_batches'. It must be a pandas Series")
+        tfidf_tokens = already_processed_tokens_batches.rename('tokens')
     if saving_directory:
         saved_indexes = []
         saving_index = 0
@@ -201,44 +228,104 @@ already_processed_tokens=None, **kwargs):
         features = pd.concat([features, curr_features], axis=0, ignore_index=False)
         tfidf_tokens = pd.concat([tfidf_tokens, tfidf_toks], axis=0, ignore_index=False) if extract_tfidf else tfidf_tokens
         if saving_directory:
-            curr_features.to_parquet(os.path.join(saving_directory , f'{features_filename}_{saving_index}{features_file_extension}'), index=True)
+            curr_features.to_parquet(os.path.join(saving_directory , f'{features_filename}_batch{saving_index}{features_file_extension}'), index=True)
             if extract_tfidf:
-                pd.DataFrame(tfidf_toks, index=tfidf_toks.index, columns=['tokens']).to_parquet(os.path.join(saving_directory , f'{tokens_filename}_{saving_index}{tokens_file_extension}'), index=True)
+                pd.DataFrame(tfidf_toks, index=tfidf_toks.index, columns=['tokens']).to_parquet(os.path.join(saving_directory , f'{tokens_filename}_batch{saving_index}{tokens_file_extension}'), index=True)
             saved_indexes.append(saving_index)
             saving_index+=1
         i+=batch_size
     
     if extract_tfidf:
-        if not fit_tfidf and (tfidf_extractor is None or not isinstance(tfidf_extractor, sklearn.base.BaseEstimator)):
-            raise ValueError('Must pass a valid tfidf_extractor to extract tf-idf vectors')            
         if fit_tfidf:
             if isinstance(kwargs['y'], (pd.Series, pd.DataFrame)) and isinstance(tfidf_tokens, (pd.Series, pd.DataFrame)):
                 merged_toks_to_category = pd.concat([tfidf_tokens, kwargs['y']], axis=1, ignore_index=False) ##merging tokens to relative category by DF indexing to ensure they are properly mapped
                 tfidf_tokens, kwargs['y'] = merged_toks_to_category.iloc[:,0], merged_toks_to_category.iloc[:,-1]
 
-        tfidf_features = extract_tfidf_matrix(tokenized_corpus=tfidf_tokens, 
+        tfidf_features = build_tfidf_matrix(tokenized_corpus=tfidf_tokens, 
                                    fit=fit_tfidf, tfidf_extractor=tfidf_extractor, to_df=True, **kwargs)\
                             .rename(lambda x: 'word_feat_'+str(x), axis=1)
         features = pd.concat([features, tfidf_features], axis=1, ignore_index=False)
     if saving_directory:
         features.to_parquet(os.path.join(saving_directory + f'/{io_utils.FEATURES_FILENAME}'), index=True)
-        [os.remove(os.path.join(saving_directory, f'features_{saving_index}.parquet')) for saving_index in saved_indexes]
+        [os.remove(os.path.join(saving_directory, f'features_batch{saving_index}.parquet')) for saving_index in saved_indexes]
         if extract_tfidf:
-            [os.remove(os.path.join(saving_directory, f'tfidf_tokens_{saving_index}.parquet')) for saving_index in saved_indexes]
+            [os.remove(os.path.join(saving_directory, f'tfidf_tokens_batch{saving_index}.parquet')) for saving_index in saved_indexes]
     
     return features
 
-def extract_features(texts, extract_tfidf: bool, tfidf_extractor: sklearn.base.BaseEstimator = None, fit_tfidf: bool = False, saving_directory: str = False, overwrite: bool = False, resume_mode: bool = False, **kwargs):
+def extract_features(texts, extract_tfidf: bool, tfidf_extractor: sklearn.base.BaseEstimator = None, fit_tfidf: bool = False, saving_directory: str = False, overwrite: bool = False, raise_errors_on_wrong_indexes: bool = None, **kwargs):
     from features_extraction_and_classification.io_utils import prepare_new_directory
-    #from pathlib import Path
+    import features_extraction_and_classification.io_utils as io_utils
+    import features_extraction_and_classification.resume_utils as resume_utils
+    from features_extraction_and_classification.resume_utils import validate_meta_file, store_meta_file
+    from features_extraction_and_classification.validate_utils import validate_x_y_inputs
+    from sklearn.utils.validation import check_is_fitted
+    from sklearn.exceptions import NotFittedError
+    from sklearn.base import clone
+
+    from pathlib import Path
+    import joblib
+    
+    if extract_tfidf:
+        if fit_tfidf and 'y' not in kwargs:
+            raise ValueError('Must include categories to fit a new tfidf_extractor')
+        try:
+            check_is_fitted(tfidf_extractor)
+        except (NotFittedError, TypeError) as e:
+            if not fit_tfidf:
+                raise NotFittedError('Must pass an already fitted tfidf_extractor if fit_tfidf is False')
+            if not tfidf_extractor is None and isinstance(e, TypeError):
+                raise TypeError('Wrong tfidf_extractor type in input')
+            elif tfidf_extractor is None:
+                tfidf_extractor = get_default_tfidf_extractor()
+                
     texts = pd.Series(__validate_text_input__(texts))
+    if extract_tfidf and fit_tfidf:
+        texts, kwargs['y'] = validate_x_y_inputs(x=texts, y=kwargs['y']) if raise_errors_on_wrong_indexes is None else validate_x_y_inputs(x=texts, y=kwargs['y'], raise_errors_on_wrong_indexes=raise_errors_on_wrong_indexes)
+    elif 'y' in kwargs:
+        warnings.warn("'y' is not needed if no need to fit tfidf_extractor. It will be ignored.")
+        kwargs['y'] = None
+    
     batch_size = kwargs.pop("batch_size", False)
-    batch_size = len(texts) + 1 if not batch_size else batch_size
+    
     if saving_directory:
-        if not resume_mode:
-            prepare_new_directory(base_dir=saving_directory, force_to_default_path=False, funct='extract_features', overwrite=overwrite)
-            #Path(saving_directory).mkdir(exist_ok=overwrite, parents=True) ###TO IMPROVE!!! Should be mkdir(exist_ok=True) if calling_funct is train/predict... otherwise prepare_new_directory
-    features = __extract_features_in_batches__(texts=texts, extract_tfidf=extract_tfidf, tfidf_extractor=tfidf_extractor, fit_tfidf=fit_tfidf, saving_directory=saving_directory, batch_size=batch_size, **kwargs)
+        if saving_directory in [True,1]:
+            saving_directory = prepare_new_directory(parent_dir=io_utils.DEFAULT_FEATURES_PATH, force_to_default_path=True, funct='extract_features', overwrite=overwrite)
+            
+        else:
+            saving_directory = prepare_new_directory(base_dir=saving_directory, force_to_default_path=False, funct='extract_features', overwrite=overwrite)
+     
+        print(f'Storing directory: {saving_directory}')
+        pd.concat(
+                [texts.rename(io_utils.TEXT_NAME_IN_STORED_DF), kwargs['y'].rename(io_utils.CATEGORY_NAME_IN_STORED_DF)] if kwargs.get('y') is not None else [texts.rename(io_utils.TEXT_NAME_IN_STORED_DF)],
+            axis=1, ignore_index=False
+        ).to_parquet(Path(saving_directory).joinpath(io_utils.TEXTS_FILENAME), index=True) ###Storing original texts (and categories, if any)
+        
+        ### RESUMING UTILS ###
+        meta_obj = {} 
+        meta_obj[resume_utils.FUNCTION_ATTRIBUTE] = 'extract_features'
+        meta_obj[resume_utils.NUMBER_OF_TEXTS_ATTRIBUTE] = len(texts)
+        meta_obj[resume_utils.BATCH_SIZE_ATTRIBUTE] = batch_size
+        meta_obj[resume_utils.TFIDF_BOOL_ATTRIBUTE] = extract_tfidf
+        
+        if extract_tfidf: ##if we extract tfidf matrix together with the features - we need to store the input parameters ('fit_tfidf' and 'tfidf_extractor') to eventually resume if anything goes wrong
+            curr_extractor_filepath = Path(saving_directory).joinpath(io_utils.TFIDF_EXTRACTOR_FILENAME)
+            
+            meta_obj[resume_utils.TFIDF_EXTRACTOR_ATTRIBUTE] = str(curr_extractor_filepath.absolute()) ##adding info on the storing location of the tfidfextractor model - we will load it from file if need to resume
+            meta_obj[resume_utils.FIT_TFIDF_ATTRIBUTE] = fit_tfidf
+            
+            if not fit_tfidf: 
+                io_utils.save_model(obj=tfidf_extractor, filename_path=curr_extractor_filepath, validate_input=False) #storing current tfidf_extractor
+                meta_obj[f'already_fitted_{resume_utils.TFIDF_EXTRACTOR_ATTRIBUTE}'] = True
+            else: ## if we have to refit it on current texts, we just clone the tfidf_extractor and store it to ensure we dont store a fitted instance and to save space on disk.
+                io_utils.save_model(obj=clone(tfidf_extractor), filename_path=curr_extractor_filepath)
+                
+        store_meta_file(meta_obj, saving_dir=saving_directory)
+    
+    batch_size = len(texts) if not batch_size else batch_size
+    features = _extract_features_in_batches(texts=texts, extract_tfidf=extract_tfidf, tfidf_extractor=tfidf_extractor, fit_tfidf=fit_tfidf, saving_directory=saving_directory, batch_size=batch_size, **kwargs) ##feature extraction
+    if saving_directory and extract_tfidf and fit_tfidf :
+        io_utils.save_model(obj=tfidf_extractor, filename_path=curr_extractor_filepath) ##storing tfidf-extractor if fitted on these texts
     return features
         
 def _extract_features_old_(text, tfidf_extractor, fit_tfidf, **kwargs):
@@ -274,9 +361,9 @@ def _extract_features_old_(text, tfidf_extractor, fit_tfidf, **kwargs):
     toxicity_df = pd.json_normalize(texts_with_emos.map(extract_toxicity)).set_index(texts_with_emos.index).rename(lambda x: f'detoxify_{x}',axis=1)
 
     #Mapping textual features to counts in BOW style - Normalizing by number of tokens
-    pos_tags_counts = map_tags_to_count(tagged_tokens, normalize=True)
-    emojis_counts = map_emojis_to_count(textual_df.emojis)
-    emoticons_counts = map_emoticons_to_count(textual_df.emoticons)
+    pos_tags_counts = _map_tags_to_count(tagged_tokens, normalize=True)
+    emojis_counts = _map_emojis_to_count(textual_df.emojis)
+    emoticons_counts = _map_emoticons_to_count(textual_df.emoticons)
     counts_df = pd.concat([entities_df, emojis_counts, emoticons_counts,
                            textual_df[['urls','mentions','repeatedPunctuation','hashtags','badwords','uppercaseWords', 'tokens', 'sentences']].map(lambda c: len(c)).rename(lambda c: c+'_count',axis=1)
                           ], axis=1, ignore_index=False)

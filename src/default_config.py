@@ -125,26 +125,9 @@ def initialize():
  'PeopleCentrism',
  'AntiElitism',
  'EmotionalAppeal',
- 'word_feat_0',
- 'word_feat_1',
- 'word_feat_2',
- 'word_feat_3',
- 'word_feat_4',
- 'word_feat_5',
- 'word_feat_6',
- 'word_feat_7',
- 'word_feat_8',
- 'word_feat_9',
- 'word_feat_10',
- 'word_feat_11',
- 'word_feat_12',
- 'word_feat_13',
- 'word_feat_14',
- 'word_feat_15',
- 'word_feat_16',
- 'word_feat_17',
- 'word_feat_18',
- 'word_feat_19']
+ ]
+ 
+ TFIDF_FEATURES_NAMES_LIKE = 'word_feat_{}'
 
 
  emoticons_list = [':)',

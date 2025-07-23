@@ -20,6 +20,9 @@ TFIDF_EXTRACTOR_FILENAME = 'tfidf_extractor.joblib'
 MODEL_FILENAME = 'model.joblib'
 PIPELINE_FILENAME = 'pipeline'
 
+TEXT_NAME_IN_STORED_DF = 'text'
+CATEGORY_NAME_IN_STORED_DF = 'category'
+
 def __build_paths__(root_path: Path):
     """Builds default saving paths from the input root."""
     root_path = Path(root_path).resolve()

@@ -3,7 +3,7 @@ import json
 import pandas as pd
 from utils import get_columns_from_parquet_file
 from features_extraction_and_classification.io_utils import TEXTS_FILENAME, TFIDF_TOKENS_FILENAME, FEATURES_FILENAME, get_stored_features_files, get_stored_tokens_files, get_whole_filelist
-from default_config import ALL_FEATURES_COLUMNS
+from default_config import ALL_FEATURES_COLUMNS, TFIDF_FEATURES_NAMES_LIKE
 
 META_FILENAME = 'meta.json'
 
@@ -17,6 +17,8 @@ MODEL_ATTRIBUTE = 'model'
 PREDICTIONS_ATTRIBUTE = 'predictions'
 FUNCTION_ATTRIBUTE = 'funct'
 TFIDF_BOOL_ATTRIBUTE = 'extract_tfidf'
+TFIDF_EXTRACTOR_ATTRIBUTE = 'tfidf_extractor'
+FIT_TFIDF_ATTRIBUTE = 'fit_tfidf'
 
 __all_possible_funct_resume__ = ["train", 'predict', "extract_features"]
 
@@ -48,9 +50,7 @@ def get_required_meta_params(funct):
         return required + [TFIDF_BOOL_ATTRIBUTE]
     return required
 
-def _is_valid_meta_dict_(meta_dict) -> bool:
-    required_common = [NUMBER_OF_TEXTS_ATTRIBUTE, BATCH_SIZE_ATTRIBUTE, FUNCTION_ATTRIBUTE]
-    
+def _is_valid_meta_dict_(meta_dict) -> bool:    
     funct = meta_dict.get(FUNCTION_ATTRIBUTE, -1)
     if funct==-1:
         raise ValueError(f"'{FUNCTION_ATTRIBUTE}' not defined")
@@ -127,7 +127,7 @@ def is_features_extraction_finished(processed_features: pd.DataFrame, expected_a
         return False
     if len(expected_all_features_index)!=len(processed_features):
         return False
-    return sorted(expected_all_features_index)==sorted(processed_features.index)
+    return expected_all_features_index.sort_values().equals(processed_features.index.sort_values())
        
     
 def is_model_train_finished(resume_dir):
@@ -151,68 +151,107 @@ def is_scaler_finished(resume_dir):
     
    
     
-def extract_features_resume(resume_dir):
+def resume_extract_features(resume_dir):
     import features_extraction_and_classification.io_utils as io_utils
-    from features_extraction_and_classification.feature_extraction import __extract_features_in_batches__, get_default_tfidf_extractor
+    from features_extraction_and_classification.feature_extraction import _extract_features_in_batches, get_default_tfidf_extractor
     if not is_valid_resume_dir(resume_dir):
-        raise ValueError('Cannot resume from chosen resume directory')
+        raise ValueError('Cannot resume from chosen resume directory: missing meta file or original texts file.')
     resume_dir = Path(resume_dir)
     orig_texts = pd.read_parquet(resume_dir.joinpath(TEXTS_FILENAME))
     processed_features = get_processed_features(resume_dir)
-    if is_features_extraction_finished(processed_features, expected_all_features_index=orig_texts.index):
-        return processed_features
     processed_tokens = get_processed_tfidf_tokens(resume_dir)
     
-    meta = validate_meta_file(Path(resume_dir).joinpath(META_FILENAME))
-    model_dir = meta[MODEL_DIR_ATTRIBUTE]
+    meta = validate_meta_file(Path(resume_dir).joinpath(META_FILENAME)) ##checking all of the current needed attributes are stored in the json file
+    funct = meta[FUNCTION_ATTRIBUTE]
     batch_size = meta[BATCH_SIZE_ATTRIBUTE]
     total_texts = meta[NUMBER_OF_TEXTS_ATTRIBUTE]
-    funct = meta[FUNCTION_ATTRIBUTE]
-    #processed_batches = meta["processed_batches"]
+    if funct=='extract_features':
+        extract_tfidf_bool = meta[TFIDF_BOOL_ATTRIBUTE]
+    else:
+        extract_tfidf_bool = True ###TO CHANGE IF WE WANT TO ADD IT AS OPTIONAL DURING TRAIN/TEST
     
-    if funct=='train':
-        ngram_range = meta[NGRAM_RANGE_ATTRIBUTE]
-        tfidf_extractor=get_default_tfidf_extractor(ngram_range=ngram_range)
-    elif funct=='predict':
-        tfidf_extractor = io_utils.load_model(model_dir + f'/{io_utils.TFIDF_EXTRACTOR_FILENAME}')
-
+    columns_to_check_in_stored_features_dataframe = ALL_FEATURES_COLUMNS + ([] if not extract_tfidf_bool else [TFIDF_FEATURES_NAMES_LIKE.format('0')])
+    if is_features_extraction_finished(processed_features, expected_all_features_index=orig_texts.index, columns=columns_to_check_in_stored_features_dataframe): 
+        return processed_features ###if all the features have already been extracted and store, just returns them as they are
+    
+    ### Validating needed attributes for the current resuming function (either 'train', 'predict' or 'extract_features')
+    if funct in ['train', 'predict']:
+        model_dir = meta[MODEL_DIR_ATTRIBUTE]
+        if funct=='train':
+            ngram_range = meta[NGRAM_RANGE_ATTRIBUTE]
+            tfidf_extractor=get_default_tfidf_extractor(ngram_range=ngram_range)
+        elif funct=='predict':
+            tfidf_extractor = io_utils.load_model(model_dir + f'/{io_utils.TFIDF_EXTRACTOR_FILENAME}')
+    elif funct=='extract_features':
+        if not extract_tfidf_bool: ##if no need to build tf-idf matrix, no need for any tfidf_tokens, then just recovering current unprocessed features and resuming them by appending them to the already processed ones
+            unprocessed_texts = orig_texts.loc[~orig_texts.index.isin(processed_features.index)]
+            saved_indexes_filenames = [int(Path(f).stem.split(Path(FEATURES_FILENAME).stem+'_batch')[-1]) for f in get_stored_features_files(resume_dir, return_whole_file=False)] ##appending indexes to properly store new features from max+1
+            print(f"Resuming features extraction --- Last saved index: {max(saved_indexes_filenames)}")
+            return _extract_features_in_batches(texts=unprocessed_texts[io_utils.TEXT_NAME_IN_STORED_DF],  
+                                                extract_tfidf=False,
+                                                saving_directory=str(resume_dir), 
+                                                batch_size=batch_size,
+                                                saved_indexes=saved_indexes_filenames, 
+                                                already_processed_features_batches = processed_features)
+        else:
+            #raise NotImplementedError()
+            tfidf_extractor = io_utils.load_model(filename_path=meta[TFIDF_EXTRACTOR_ATTRIBUTE], validate_input=False)
+            fit_tfidf = meta[FIT_TFIDF_ATTRIBUTE]
+        
+    else:
+        raise NotImplementedError('Invalid resume_dir, it must be either a previously stored directory from train,  predict, or extract_features')
+    
     if processed_tokens.empty or processed_features.empty:        
         if funct=='train':
-            return __extract_features_in_batches__(texts=orig_texts['text'], y=orig_texts['cat'], batch_size=batch_size, 
-        tfidf_extractor=tfidf_extractor, fit_tfidf=True, ngram_range=ngram_range,
-        saving_directory=str(resume_dir), overwrite=True, resume_mode=True)
+            return _extract_features_in_batches(texts=orig_texts[io_utils.TEXT_NAME_IN_STORED_DF], y=orig_texts[io_utils.CATEGORY_NAME_IN_STORED_DF], 
+            batch_size=batch_size, 
+            tfidf_extractor=tfidf_extractor, 
+            fit_tfidf=True, 
+            ngram_range=ngram_range,
+            saving_directory=str(resume_dir))
         elif funct=='predict':
-            return __extract_features_in_batches__(texts=orig_texts['text'], tfidf_extractor=tfidf_extractor, fit_tfidf=False, 
-            batch_size=batch_size, saving_directory=str(resume_dir), overwrite=True, resume_mode=True)
-        else:
-            raise NotImplementedError('')
-    
+            return _extract_features_in_batches(texts=orig_texts[io_utils.TEXT_NAME_IN_STORED_DF], 
+            tfidf_extractor=tfidf_extractor, 
+            fit_tfidf=False, 
+            batch_size=batch_size, 
+            saving_directory=str(resume_dir))
+        elif funct=='extract_features':
+            return _extract_features_in_batches(texts=orig_texts[io_utils.TEXT_NAME_IN_STORED_DF], y=orig_texts[io_utils.CATEGORY_NAME_IN_STORED_DF], 
+            batch_size=batch_size, 
+            tfidf_extractor=tfidf_extractor, 
+            fit_tfidf=fit_tfidf, 
+            saving_directory=str(resume_dir))
+                
+        
+    ###Recovering previously processed features filenames in order to store new files with proper indexes
     curr_features_files =  get_stored_features_files(resume_dir, return_whole_file=False)
     curr_tokens_files =  get_stored_tokens_files(resume_dir, return_whole_file=False)
-    features_files_indexes = [int(Path(f).stem.split(Path(FEATURES_FILENAME).stem+'_')[-1]) for f in curr_features_files]
-    tokens_files_indexes = [int(Path(f).stem.split(Path(TFIDF_TOKENS_FILENAME).stem+'_')[-1]) for f in curr_tokens_files]
+    features_files_indexes = [int(Path(f).stem.split(Path(FEATURES_FILENAME).stem+'_batch')[-1]) for f in curr_features_files]
+    tokens_files_indexes = [int(Path(f).stem.split(Path(TFIDF_TOKENS_FILENAME).stem+'_batch')[-1]) for f in curr_tokens_files]
     
-    if sorted(processed_features.index) != sorted(processed_tokens.index): ###Checking that features and tokens belong to the same texts objects
+    ###Checking that previously processed features and tokens are from the same imput texts - otherwise just keeping the texts processed for both features and tokens and re-processing all of the remaining ones 
+    if sorted(processed_features.index) != sorted(processed_tokens.index): 
         common_processed_texts_idx = processed_features.index.intersection(processed_tokens.index) ##getting processed texts for both features and tfidftokens
         processed_features = processed_features.loc[common_processed_texts_idx]
         processed_tokens = processed_tokens.loc[common_processed_texts_idx]
 
-        # Removing old files and only saving the common_processed_features into new files
+        # Removing old files and only saving the common_processed_features into new files ('features_batch0.parquet' and 'tfidf_tokens_batch0.parquet')
         for f in curr_features_files + curr_tokens_files:
             Path(f).unlink()
-        processed_features.to_parquet(resume_dir.joinpath(f'{Path(FEATURES_FILENAME).stem}_0{Path(FEATURES_FILENAME).suffix}'), index=True)
-        processed_tokens.to_parquet(resume_dir.joinpath(f'{Path(TFIDF_TOKENS_FILENAME).stem}_0{Path(TFIDF_TOKENS_FILENAME).suffix}'), index=True)
+        processed_features.to_parquet(resume_dir.joinpath(f'{Path(FEATURES_FILENAME).stem}_batch0{Path(FEATURES_FILENAME).suffix}'), index=True)
+        processed_tokens.to_parquet(resume_dir.joinpath(f'{Path(TFIDF_TOKENS_FILENAME).stem}_batch0{Path(TFIDF_TOKENS_FILENAME).suffix}'), index=True)
         
         saved_indexes_filenames = [0]
         
     else:
         saved_indexes_filenames = features_files_indexes
     
+    ### extracting features for the previously unprocessed texts only
     unprocessed_texts = orig_texts.loc[~orig_texts.index.isin(processed_features.index)]
 
     print(f"Resuming features extraction --- Last saved index: {max(saved_indexes_filenames)}")
     if funct=='train':
-        return __extract_features_in_batches__(texts=unprocessed_texts['text'], y=orig_texts['cat'], 
+        return _extract_features_in_batches(texts=unprocessed_texts[io_utils.TEXT_NAME_IN_STORED_DF], y=orig_texts[io_utils.CATEGORY_NAME_IN_STORED_DF], 
         extract_tfidf=True,
         tfidf_extractor=tfidf_extractor, 
         fit_tfidf=True, 
@@ -220,22 +259,37 @@ def extract_features_resume(resume_dir):
         saving_directory=str(resume_dir), 
         batch_size=batch_size,
         saved_indexes=saved_indexes_filenames, 
-        already_processed_features = processed_features, 
-        already_processed_tokens = processed_tokens[processed_tokens.columns[0]],
-        resume_mode=True)
-    if funct=='predict':
-        return __extract_features_in_batches__(
-            texts=unprocessed_texts['text'],
+        already_processed_features_batches = processed_features, 
+        already_processed_tokens_batches = processed_tokens[processed_tokens.columns[0]],
+        )        
+        
+    elif funct=='predict':
+        return _extract_features_in_batches(
+        texts=unprocessed_texts[io_utils.TEXT_NAME_IN_STORED_DF],
+        extract_tfidf=True,
+        tfidf_extractor = tfidf_extractor,
+        fit_tfidf=False,
+        saving_directory=str(resume_dir),
+        batch_size=batch_size,
+        saved_indexes=saved_indexes_filenames,
+        already_processed_features_batches = processed_features,
+        already_processed_tokens_batches = processed_tokens[processed_tokens.columns[0]],
+        )
+        
+    elif funct=='extract_features':
+        if extract_tfidf_bool:
+            return _extract_features_in_batches(texts=unprocessed_texts[io_utils.TEXT_NAME_IN_STORED_DF], y=orig_texts[io_utils.CATEGORY_NAME_IN_STORED_DF], 
             extract_tfidf=True,
-            tfidf_extractor = tfidf_extractor,
-            fit_tfidf=False,
-            saving_directory=str(resume_dir),
+            tfidf_extractor=tfidf_extractor, 
+            fit_tfidf=fit_tfidf, 
+            saving_directory=str(resume_dir), 
             batch_size=batch_size,
-            saved_indexes=saved_indexes_filenames,
-            already_processed_features = processed_features,
-            already_processed_tokens = processed_tokens[processed_tokens.columns[0]],
-            resume_mode=True
+            saved_indexes=saved_indexes_filenames, 
+            already_processed_features_batches = processed_features, 
+            already_processed_tokens_batches = processed_tokens[processed_tokens.columns[0]],
             )
+        else:
+            raise ValueError('Should never happen')
     raise NotImplementedError('')
    
     
