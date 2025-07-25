@@ -11,6 +11,7 @@ MODELS_DIR = DATA_DIR+'/models'
 FEATURES_DIR = DATA_DIR+'/features'
 PREDICTIONS_DIR = '/predictions'
 
+META_FILENAME = 'meta.json'
 TEXTS_FILENAME = 'texts.parquet'
 FEATURES_FILENAME = 'features.parquet'
 TFIDF_TOKENS_FILENAME = 'tfidf_tokens.parquet'
@@ -116,6 +117,12 @@ def get_stored_tokens_files(dirpath, return_batches_files=True, return_whole_fil
         curr_features_files = [file for file in curr_features_files if file==str(Path(dirpath).joinpath(TFIDF_TOKENS_FILENAME))]
     return curr_features_files
     
+def _get_missing_models(model_dir):
+    model_path = Path(model_dir)
+    all_expected_models_files = [SCALER_FILENAME, TFIDF_EXTRACTOR_FILENAME, MODEL_FILENAME]
+    directory_files = [filepath.name for filepath in model_path.iterdir() if filepath.is_file()]
+    models_files_present = [model_file for model_file in all_expected_models_files if model_file in directory_files]   
+    return set(all_expected_models_files) - set(models_files_present)
 
 
 def __check_is_valid_model_dir__(model_dir):
@@ -139,7 +146,7 @@ def validate_existing_model_dir(model_dir: str) -> str:
     if not __check_is_valid_model_dir__(model_dirpath):
         model_dirpath = Path(DEFAULT_MODELS_PATH).joinpath(model_dir)
         if not __check_is_valid_model_dir__(model_dirpath):
-            raise ValueError('Cannot find model at the specified directory')
+            raise ValueError(f'Cannot find all needed models at the specified directory. Missing {_get_missing_models(model_dir)}')
     return str(model_dirpath)#.absolute()
 
 
@@ -152,7 +159,7 @@ def __get_new_directory__(parent_dir: str) -> str:
     
     return new_dir
 
-def validate_new_dir(new_dir: str, force_to_default_path: bool = True, funct = None, overwrite: bool = False) -> str:
+def __validate_new_dir__(new_dir: str, force_to_default_path: bool = True, funct = None, overwrite: bool = False) -> str:
     """
     Given the input directory, checks if it already exists.
     If force_to_default_path is True, checks if it belongs to the DEFAULT subdirectory, otherwise raises an error.
@@ -190,7 +197,7 @@ def validate_new_dir(new_dir: str, force_to_default_path: bool = True, funct = N
     return str(new_dir)
 
 
-def prepare_new_directory(base_dir=None, parent_dir=None, force_to_default_path=False, funct=None, overwrite=False):
+def prepare_new_directory(base_dir=None, parent_dir=None, force_to_default_path=False, funct=None):
     """
     Creates and returns a new dir or validates an existing one.
     If base_dir: use it, otherwise creates a new numbered subdir inside parent_dir.
@@ -202,7 +209,7 @@ def prepare_new_directory(base_dir=None, parent_dir=None, force_to_default_path=
     curr_dir = Path(base_dir) if base_dir else __get_new_directory__(parent_dir)
 
     # Validate (includes overwrite handling)
-    curr_dir = Path(validate_new_dir(curr_dir, force_to_default_path=force_to_default_path, funct=funct, overwrite=overwrite))
+    curr_dir = Path(__validate_new_dir__(curr_dir, force_to_default_path=force_to_default_path, funct=funct, overwrite=False))
 
     # Create directory if not exists
     if not curr_dir.exists():
