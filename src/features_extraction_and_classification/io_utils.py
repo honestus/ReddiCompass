@@ -9,17 +9,19 @@ DEFAULT_ROOT = get_package_root()
 DATA_DIR = 'data/rundata'
 MODELS_DIR = DATA_DIR+'/models'
 FEATURES_DIR = DATA_DIR+'/features'
-PREDICTIONS_DIR = '/predictions'
+PREDICTIONS_DIR = 'predictions'
 
 META_FILENAME = 'meta.json'
 TEXTS_FILENAME = 'texts.parquet'
 FEATURES_FILENAME = 'features.parquet'
 TFIDF_TOKENS_FILENAME = 'tfidf_tokens.parquet'
 PREDICTIONS_FILENAME = 'predictions.parquet'
-SCALER_FILENAME = 'scaler.joblib'
+
 TFIDF_EXTRACTOR_FILENAME = 'tfidf_extractor.joblib'
+FEATURE_EXTRACTOR_FILENAME = 'features_extractor.joblib'
+SCALER_FILENAME = 'scaler.joblib'
 MODEL_FILENAME = 'model.joblib'
-PIPELINE_FILENAME = 'pipeline'
+PIPELINE_FILENAME = 'pipeline.joblib'
 
 TEXT_NAME_IN_STORED_DF = 'text'
 CATEGORY_NAME_IN_STORED_DF = 'category'
@@ -159,42 +161,43 @@ def __get_new_directory__(parent_dir: str) -> str:
     
     return new_dir
 
-def __validate_new_dir__(new_dir: str, force_to_default_path: bool = True, funct = None, overwrite: bool = False) -> str:
+def __validate_new_dir__(dirpath: str, force_to_default_path: bool = True, funct = None, overwrite: bool = False) -> str:
     """
     Given the input directory, checks if it already exists.
     If force_to_default_path is True, checks if it belongs to the DEFAULT subdirectory, otherwise raises an error.
     For extract_features: if overwrite=True, deletes only features files.
     """
-    new_dir = Path(new_dir)
+    dirpath = Path(dirpath)
 
-    # Validate funct
-    if funct is None:
-        raise ValueError("Must specify 'funct' to properly validate path (train, predict, extract_features).")
-    elif funct not in ['train', 'predict', 'extract_features']:
-        raise ValueError("'funct' must be either 'train', 'predict' or 'extract_features'")
-
-    # Force directory inside correct default path
     if force_to_default_path:
+        # Validate funct
+        if funct is None:
+            raise ValueError("Must specify 'funct' to properly validate path (train, predict, extract_features).")
+        elif funct not in ['train', 'predict', 'extract_features']:
+            raise ValueError("'funct' must be either 'train', 'predict' or 'extract_features'")
+        # Force directory inside correct default path
         if funct in ['train', 'predict']:
             default_path = DEFAULT_MODELS_PATH
         else:
             default_path = DEFAULT_FEATURES_PATH
-        if not __is_subdir__(new_dir, default_path):
-            raise ValueError(f"Directory '{new_dir}' must be inside '{default_path}'. "
+        if not __is_subdir__(dirpath, default_path):
+            raise ValueError(f"Directory '{dirpath}' must be inside '{default_path}'. "
                              f"Set force_to_default_path=False to allow custom paths.")
 
-    if new_dir.exists():
+    if dirpath.exists():
         if funct == 'extract_features' and overwrite:
             # Remove all already existing features/tokens files from new_dir
-            all_features_filepaths = [Path(f) for f in get_stored_features_files(new_dir)] + [Path(f) for f in get_stored_tokens_files(new_dir)]
+            all_features_filepaths = [Path(f) for f in get_stored_features_files(dirpath)] + [Path(f) for f in get_stored_tokens_files(dirpath)]
             for f in all_features_filepaths:
                 f.unlink()
         else:
             # For train/predict OR extract_features without overwrite
-            raise FileExistsError(f"Directory '{new_dir}' already exists. "
-                                  f"Use overwrite=True if you intend to clear existing features files and saving new ones.")
+            curr_error_msg = f"Directory '{dirpath}' already exists."
+            if funct=='extract_features':
+                curr_error_msg+= "\nUse overwrite=True if you intend to clear existing features files and saving new ones."
+            raise FileExistsError(curr_error_msg)
 
-    return str(new_dir)
+    return str(dirpath)
 
 
 def prepare_new_directory(base_dir=None, parent_dir=None, force_to_default_path=False, funct=None):
@@ -219,6 +222,7 @@ def prepare_new_directory(base_dir=None, parent_dir=None, force_to_default_path=
     
     
 def load_model(filename_path: str, validate_input: bool=True) -> object:
+    import warnings
     if not validate_input:
         return joblib.load(filename_path)
     filename_path = Path(filename_path)
@@ -227,7 +231,7 @@ def load_model(filename_path: str, validate_input: bool=True) -> object:
          file_extension = '.joblib'
          filename_path = Path(str(filename_path)+file_extension)
     if not __map_modelname_to_type__(filename+file_extension):
-        raise ValueError(f'No default filename used. Use one among [{SCALER_FILENAME}, {TFIDF_EXTRACTOR_FILENAME}, {MODEL_FILENAME}] or set validate_input to False to load from non-default filenames')
+        raise ValueError(f'No default filename used. Use one among [{SCALER_FILENAME}, {TFIDF_EXTRACTOR_FILENAME}, {MODEL_FILENAME}, {PIPELINE_FILENAME}] or set validate_input to False to load from non-default filenames')
         
     return joblib.load(filename_path)
 
@@ -244,8 +248,9 @@ def save_model(obj, filename_path: str, validate_input: bool=True) -> None:
         if validate_input:
             raise ValueError(f"Invalid filename '{filename}' to store the {type(obj)} object. Use {default_filename} or set validate_input to False to store it anyway")
         else:
-            warnings.warnings(f"You're saving a {type(obj).__name__} object with a non-default filename: '{filename}'. \n"\
-            "Storing it anyway, but this may lead to unexpected behaviors in future loadings.")
+            pass
+            """warnings.warnings(f"You're saving a {type(obj).__name__} object with a non-default filename: '{filename}'. \n"\
+            "Storing it anyway, but this may lead to unexpected behaviors in future loadings.")"""
     if not file_extension:
         file_extension = '.joblib'
         filename_path = Path(str(filename_path)+file_extension)
@@ -256,6 +261,7 @@ def __get_model_type_name_mapping__():
     from sklearn.preprocessing import MinMaxScaler
     from sklearn.feature_extraction.text import TfidfVectorizer
     from sklearn.base import BaseEstimator
+    from features_extraction_and_classification.model_pipeline import SavingPipeline, FeatureExtractor
     
     global __TYPE_FILENAME_MAP__ 
     if __TYPE_FILENAME_MAP__ is None:
@@ -270,9 +276,11 @@ def __get_model_type_name_mapping__():
             )
             
         __TYPE_FILENAME_MAP__ = [
+            (lambda obj: isinstance(obj, SavingPipeline), PIPELINE_FILENAME),
+            (lambda obj: isinstance(obj, FeatureExtractor), FEATURE_EXTRACTOR_FILENAME),
             (lambda obj: isinstance(obj, MinMaxScaler), SCALER_FILENAME),
             (lambda obj: is_tfidf(obj), TFIDF_EXTRACTOR_FILENAME),
-            (lambda obj: isinstance(obj, BaseEstimator), MODEL_FILENAME)
+            (lambda obj: isinstance(obj, BaseEstimator), MODEL_FILENAME),
         ]
     return __TYPE_FILENAME_MAP__
 

@@ -14,8 +14,9 @@ BATCH_SIZE_ATTRIBUTE = 'batch_size'
 NGRAM_RANGE_ATTRIBUTE = 'ngram_range'
 TOP_K_ATTRIBUTE = 'top_k'
 FEATURES_ATTRIBUTE = 'features'
-SCALER_ATTRIBUTE = 'scaler'
-MODEL_ATTRIBUTE = 'model'
+SCALER_TYPE_ATTRIBUTE = 'scaler_type'
+MODEL_TYPE_ATTRIBUTE = 'model_type'
+FEATURE_EXTRACTOR_ATTRIBUTE = 'feature_extractor'
 PREDICTIONS_ATTRIBUTE = 'predictions'
 FUNCTION_ATTRIBUTE = 'funct'
 TFIDF_BOOL_ATTRIBUTE = 'extract_tfidf'
@@ -77,9 +78,6 @@ def _is_valid_meta_dict_(meta_dict) -> bool:
     return True
     
     
-
-    
-
 def is_valid_resume_dir(resume_dir: str|Path) -> bool:
     if not isinstance(resume_dir, (str, Path)):
         raise ValueError('Please specify a valid directory to resume from')
@@ -88,8 +86,6 @@ def is_valid_resume_dir(resume_dir: str|Path) -> bool:
     texts_filepath = resume_path.joinpath(io_utils.TEXTS_FILENAME)
     
     return meta_filepath.exists() and texts_filepath.exists()
-   
-   
 
 
 
@@ -186,8 +182,13 @@ def is_normalization_finished(resume_dir: str, funct: str):
     if funct=='predict':
         return True
     resume_dir = Path(resume_dir)
-    curr_files = list(map(lambda x: Path(x).name, io_utils.get_whole_filelist(Path(resume_dir))))
+    curr_files = list(map(lambda x: Path(x).name, io_utils.get_whole_filelist(resume_dir)))
     return io_utils.SCALER_FILENAME in curr_files
+    
+def is_pipeline_stored(resume_dir: str):
+    resume_dir = Path(resume_dir)
+    curr_files = list(map(lambda x: Path(x).name, io_utils.get_whole_filelist(resume_dir)))
+    return io_utils.PIPELINE_FILENAME in curr_files
     
    
     
