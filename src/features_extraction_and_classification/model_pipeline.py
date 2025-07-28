@@ -1,17 +1,13 @@
 from sklearn.base import BaseEstimator, TransformerMixin
-from sklearn.preprocessing import MinMaxScaler
-from sklearn.svm import LinearSVC
 from sklearn.pipeline import Pipeline
 from features_extraction_and_classification.tfidf_utils import get_default_tfidf_extractor, get_ngram_topk_from_tfidf_extractor
 from features_extraction_and_classification.feature_extraction import extract_features, _extract_features_in_batches
 from features_extraction_and_classification.validate_utils import to_resume_flag
 from features_extraction_and_classification.resume_utils import validate_meta_file, resume_extract_features
 from text_processing.text_filtering_utils import get_nonstopwords_tokens
-from sklearn.utils.validation import check_is_fitted
-from sklearn.exceptions import NotFittedError
 from features_extraction_and_classification import io_utils as io_utils
-sys.path.append('../../../tesi/code/Moral_Foundation_FrameAxis/')
-# Step 1: Create a custom transformer for feature extraction
+
+# Custom est
 class FeatureExtractor(BaseEstimator, TransformerMixin):
     def __init__(self, extract_tfidf=True, top_k=None, ngram_range=None):
         self.extract_tfidf = extract_tfidf

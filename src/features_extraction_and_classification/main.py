@@ -1,13 +1,15 @@
 import pandas as pd
 import numpy as np
-from sklearn.feature_extraction.text import TfidfTransformer, CountVectorizer
 from features_extraction_and_classification.feature_extraction import _extract_features_in_batches
 import features_extraction_and_classification.io_utils as io_utils
 import features_extraction_and_classification.resume_utils as resume_utils
 from features_extraction_and_classification.resume_utils import validate_meta_file, store_meta_file, is_valid_resume_dir, _is_features_extraction_finished_, is_model_train_finished, is_normalization_finished, is_pipeline_stored, get_processed_features, resume_extract_features
 from features_extraction_and_classification.validate_utils import validate_x_y_inputs, to_resume_flag, validate_tfidf_user_inputs, validate_tfidf_parameters, validate_text_input, validate_batch_size
 from features_extraction_and_classification.tfidf_utils import get_default_tfidf_extractor, get_ngram_topk_from_tfidf_extractor
-
+from features_extraction_and_classification.model_pipeline import SavingPipeline, FeatureExtractor
+from sklearn.base import BaseEstimator
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.svm import LinearSVC
 
 
 import shutil
@@ -135,6 +137,8 @@ def train_pipeline(texts: str | list[str] | pd.Series, categories: np.ndarray | 
 
 def predict_pipeline(texts: str | list[str] | pd.Series, pipeline: SavingPipeline, save: bool = False, saving_directory: str = None, resume_dir: str = None, batch_size: int = -1):
     import warnings
+    from sklearn.utils.validation import check_is_fitted
+    from sklearn.exceptions import NotFittedError
     
     if to_resume_flag(resume_dir):
         if is_predictions_finished(resume_dir):
@@ -159,7 +163,7 @@ def predict_pipeline(texts: str | list[str] | pd.Series, pipeline: SavingPipelin
 
 
     else: ##new run - no resume
-        if not isinstance(pipeline), SavingPipeline):
+        if not isinstance(pipeline, SavingPipeline):
             raise TypeError('Input pipeline must be a SavingPipeline object')
         try:
             check_is_fitted(pipeline)
