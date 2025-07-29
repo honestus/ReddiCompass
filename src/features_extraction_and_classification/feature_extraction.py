@@ -233,7 +233,7 @@ already_processed_tokens_batches=None, **kwargs):
     return features
 
 
-def extract_features(texts, extract_tfidf: bool, tfidf_extractor: sklearn.base.BaseEstimator = None, fit_tfidf: bool = False, categories: list|np.ndarray|pd.Series = None, save: bool = False, saving_directory: str = None, resume_dir: str = None, batch_size: int = -1, raise_errors_on_wrong_indexes: bool = False, **kwargs):
+def extract_features(texts: str | list[str] = None, extract_tfidf: bool = False, tfidf_extractor: sklearn.base.BaseEstimator = None, fit_tfidf: bool = False, categories: list|np.ndarray|pd.Series = None, save: bool = False, saving_directory: str = None, resume_dir: str = None, batch_size: int = -1, raise_errors_on_wrong_indexes: bool = False, **kwargs):
     from features_extraction_and_classification.io_utils import prepare_new_directory
     import features_extraction_and_classification.io_utils as io_utils
     import features_extraction_and_classification.resume_utils as resume_utils
@@ -245,6 +245,8 @@ def extract_features(texts, extract_tfidf: bool, tfidf_extractor: sklearn.base.B
 
 
     if not to_resume_flag(resume_dir): 
+        if texts is None:
+            raise ValueError('You must use valid "texts" to extract features from if not resuming from previously saved texts.')
         ngram_range = kwargs.get('ngram_range', None) ##validating parameters (texts, tfidf inputs...)
         top_k = kwargs.get('top_k', None)
         validate_tfidf_user_inputs(extract_tfidf=extract_tfidf, tfidf_extractor=tfidf_extractor, fit_tfidf=fit_tfidf, ngram_range=ngram_range, y=categories, top_k=top_k)

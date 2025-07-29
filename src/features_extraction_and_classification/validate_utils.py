@@ -92,14 +92,27 @@ def validate_x_y_inputs(x, y, check_order=True, to_pandas_series = True, raise_e
     return x,y
     
   
-def validate_text_input(text):
+  
+def __is_valid_single_text__(text):
     from text_processing.textractor import TexTractor
-    if isinstance(text, (str, TexTractor)):
-        return [text]
-    if isinstance(text, (list, np.ndarray, pd.Series)):
-        if any(not isinstance(txt, (str, TexTractor)) for txt in text):
-            raise TypeError("Input text must be either a string, a TexTractor instance, or a collection (list, array, pandas.Series) of such types")
-        return text
+    if not isinstance(text, (str, TexTractor)):
+        return -1
+    return bool(text)
+  
+def validate_text_input(texts):
+    from text_processing.textractor import TexTractor
+    if isinstance(texts, (str, TexTractor)):
+        if not __is_valid_single_text__(texts):
+            raise ValueError('Input text must be non-empty')
+        return [texts]
+    if isinstance(texts, (list, np.ndarray, pd.Series)):
+        if not len(texts):
+            raise ValueError('The input texts must be a non-empty collection')
+        if any(not __is_valid_single_text__(t) for t in texts):
+            raise ValueError('The input collection cannot contain empty texts.')
+        if any(__is_valid_single_text__(t)==-1 for t in texts):
+            raise TypeError("Input text must be either a string, a TexTractor instance, or a collection of such types")
+        return texts
     raise TypeError( "Input text must be either a string, a TexTractor instance, or a collection (list, array, pandas.Series) of such types")
 
   
