@@ -85,7 +85,7 @@ predictions = predict_pipeline(pipeline=p, texts=predicting_texts, save=False) #
 print(predictions)
 ```
 
-### Example 4: resuming from previously failed feature extraction
+### Example 4: resuming feature extraction from intermediate partial results
 
 ```python
 from features_extraction_and_classification.feature_extraction import extract_features
