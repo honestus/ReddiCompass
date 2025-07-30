@@ -1,0 +1,27 @@
+include README.md
+recursive-include data *
+
+# Exclude dev and build artifacts
+recursive-exclude jupyter_files *
+recursive-exclude src/test *
+recursive-exclude */__pycache__ *
+recursive-exclude * .ipynb_checkpoints
+exclude readme_virtenv.txt
+exclude data/word2vec_twitter_model.bin
+
+# Exclude all of rundata except models/.default and its necessary files
+recursive-exclude data/rundata *
+prune data/rundata
+
+# Re-include only the required model files
+include data/rundata/models/.default/model.joblib
+include data/rundata/models/.default/scaler.joblib
+include data/rundata/models/.default/tfidf_extractor.joblib
+
+include data/rundata/models/.default/horizontal/model.joblib
+include data/rundata/models/.default/horizontal/scaler.joblib
+include data/rundata/models/.default/horizontal/tfidf_extractor.joblib
+
+include data/rundata/models/.default/vertical/model.joblib
+include data/rundata/models/.default/vertical/scaler.joblib
+include data/rundata/models/.default/vertical/tfidf_extractor.joblib

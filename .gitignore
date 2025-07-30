@@ -23,3 +23,5 @@ data/rundata/models/.default/vertical/*
 !data/rundata/models/.default/vertical/scaler.joblib
 !data/rundata/models/.default/vertical/tfidf_extractor.joblib
 src/test/*
+src/ReddiCompass.egg-info/*
+dist/*

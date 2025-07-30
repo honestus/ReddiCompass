@@ -16,4 +16,5 @@ pyarrow
 gensim
 nrclex @ git+https://github.com/stormbeforesunsetbee/NRCLex.git
 Pattern @ git+https://github.com/NicolasBizzozzero/pattern@66ab34453a3443c06a4ebda092c8d1947c83b17a
+Moral_Foundation_FrameAxis @ git+https://github.com/edoardo-lucini/Moral_Foundation_FrameAxis.git
 spacy
