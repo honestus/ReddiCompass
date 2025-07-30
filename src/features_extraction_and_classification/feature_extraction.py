@@ -14,10 +14,14 @@ from features_extraction_and_classification.validate_utils import validate_text_
 import warnings, sklearn
 
 def __fillna__(feature_series, training_set):
-    if training_set is None:
+    if not isinstance(training_set, (pd.DataFrame, pd.Series)):
         return 0
-    return feature_series.fillna(training_set[feature_series.name].mean())
-
+    try:
+        return feature_series.fillna(training_set[feature_series.name].mean())
+    except:
+        return 0
+        
+        
 def _map_emojis_to_count(emojis_series, include_positive_and_negative=True):
     if not include_positive_and_negative:
         return emojis_series.map(lambda x: len(x))
@@ -158,13 +162,13 @@ def __extract_no_tfidf_features__(text, append_return_filtered_tokens=False):
     #Putting all features together
     features_df = pd.concat([counts_df, pos_tags_counts, toxicity_df,modality_df,sentiment_df,emotions_df,vad_df,social_df,moral_foundations_df, populism_df],
           axis=1, ignore_index=False)    
-
     if features_df.isna().any().any():
         columns_with_nans = features_df.columns[features_df.isnull().any()]
+        training_set=pd.read_pickle(str(default_config._curr_root)+'/data/training_set_means.pkl')
         for column in columns_with_nans:
-            features_df[column] = __fillna__(features_df[column], training_set=pd.read_parquet('C:/Users/onest/Documents/TextAn/tesi/code/data/models/ML/final/train.parquet'))
+            features_df[column] = __fillna__(features_df[column], training_set=training_set)
     return (features_df, tfidf_tokens) 
-    
+
     
 def extract_no_tfidf_features(text):
     return __extract_no_tfidf_features__(text, append_return_filtered_tokens=False)[0]
