@@ -1,24 +1,24 @@
 [build-system]
-requires = ["setuptools>=42", "wheel"]
+requires = ["setuptools>=77.0.3", "wheel"]
 build-backend = "setuptools.build_meta"
 
-[tool.setuptools]
+[project]
 name = "ReddiCompass"
 version = "0.1.0"
 description = "A package for tailored text processing, feature extraction and text classification from Social Media texts"
-long_description = "file: README.md"
-long_description_content_type = "text/markdown"
-author = "honestus"
-author_email = "onesto.giuseppe@gmail.com"
+readme = {file = "README.md", content-type = "text/markdown"}
+
+authors = [
+{name="Giuseppe Onesto", email = "onesto.giuseppe@gmail.com"}
+]
 url = "https://github.com/honestus/ReddiCompass"
 include_package_data = true
 packages = ["ReddiCompass", "ReddiCompass.text_processing"] 
 package_dir = {"" = "src"}
 #py_modules = ["default_config.py", "utils.py", "download_utils.py"]
-python_requires = ">=3.7,<3.12"
+requires-python = ">=3.7,<3.12"
 
-[tool.setuptools.dependencies]
-install_requires = [
+dependencies = [
     "pandas>=2.3.1",
     "numpy>=1.26.4",
     "scikit-learn==1.6.1",
@@ -40,13 +40,14 @@ install_requires = [
     "Pattern @ git+https://github.com/NicolasBizzozzero/pattern@66ab34453a3443c06a4ebda092c8d1947c83b17a"
 ]
 
-[tool.setuptools.classifiers]
+keywords = ["reddit", "SMN", "social", "network", "NLP", "PoliticalCompass", "TexTractor", "text", "extraction", "language", "natural", "twitter", "hashtag", "emoji", "mention", "lexicon", "lexical", "textual", "feature"]
+
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
-    "Operating System :: OS Independent"
+    "Operating System :: OS Independent",
+	"Development Status :: 5 - Production/Stable"
 ]
 
-[tool.setuptools.options]
-# This section can be used to specify custom options for setuptools
-# as needed.
+[project.urls]
+Homepage = "https://github.com/honestus/ReddiCompass"
