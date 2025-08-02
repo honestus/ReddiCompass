@@ -2,6 +2,8 @@
 requires = ["setuptools>=77.0.3", "wheel"]
 build-backend = "setuptools.build_meta"
 
+
+
 [project]
 name = "ReddiCompass"
 version = "0.1.0"
@@ -11,11 +13,6 @@ readme = {file = "README.md", content-type = "text/markdown"}
 authors = [
 {name="Giuseppe Onesto", email = "onesto.giuseppe@gmail.com"}
 ]
-url = "https://github.com/honestus/ReddiCompass"
-include_package_data = true
-packages = ["ReddiCompass", "ReddiCompass.text_processing"] 
-package_dir = {"" = "src"}
-#py_modules = ["default_config.py", "utils.py", "download_utils.py"]
 requires-python = ">=3.7,<3.12"
 
 dependencies = [
@@ -51,3 +48,11 @@ classifiers = [
 
 [project.urls]
 Homepage = "https://github.com/honestus/ReddiCompass"
+
+
+[tool.setuptools.packages.find]
+where = ["src/"]
+include = ["ReddiCompass.text_processing", "ReddiCompass.features_extraction_and_classification"]
+
+[tool.setuptools.package-data]
+ReddiCompass = ['data/*']
