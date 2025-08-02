@@ -65,7 +65,7 @@ extract_features(texts, batch_size=100, save=True, saving_directory=saving_direc
 from features_extraction_and_classification.main import train_pipeline, predict_pipeline
 from features_extraction_and_classification import io_utils as io_utils
 texts = [
-    "Just watched the new episode of my favorite show 😍 #bingeing #Netflix",
+    "Just watched the new episode of my favorite show #bingeing #Netflix",
     "AMAZING results from our campaign!!! Thanks to all who supported 💪 #TeamWork",
     "Best coffee ever ☕️! This place is a hidden gem 💎 #NapoliVibes",
 ...
