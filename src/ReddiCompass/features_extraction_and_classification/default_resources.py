@@ -47,7 +47,7 @@ def __load_word2vec_model__(model_path):
 
 
 def get_frameaxis_instance():
-    from frameAxis import FrameAxis
+    from Moral_Foundations_Frameaxis.frameAxis import FrameAxis
     global _word2vec_model
     global _frameaxis
     if _frameaxis is None:
