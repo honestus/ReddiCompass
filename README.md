@@ -29,7 +29,7 @@ The following example demonstrates how to process a single text and extract text
 from text_processing.textractor import TexTractor
 
 # Example Reddit text
-t = TexTractor("This is a r/reddit text and it's amazing! 😀 Try it out 🚀 #reddit www.reddit.com")
+t = TexTractor( "This is a r/reddit text and it's amazing! 😄 Try it out 🚀 #reddit www.reddit.com")
 
 
 # Process the text to extract all features
@@ -38,7 +38,7 @@ t.process()
 # Get features from the text
 mentions = t.get_mentions()
 print(mentions) ## will print ['r/reddit', feature_type: 'mention']
-emojis = t.get_emojis() ## will contain ['😀', '🚀']
+emojis = t.get_emojis() ## will contain ['😄', '🚀']
 
 
 # Get all features from the processed text
@@ -65,9 +65,9 @@ extract_features(texts, batch_size=100, save=True, saving_directory=saving_direc
 from features_extraction_and_classification.main import train_pipeline, predict_pipeline
 from features_extraction_and_classification import io_utils as io_utils
 texts = [
-    "Just watched the new episode of my favorite show #bingeing #Netflix",
-    "AMAZING results from our campaign!!! Thanks to all who supported 💪 #TeamWork",
-    "Best coffee ever ☕️! This place is a hidden gem 💎 #NapoliVibes",
+     "Just watched the new episode of my favorite show 😍 #bingeing #Netflix",
+     "AMAZING results from our campaign!!! Thanks to all who supported 💪 #TeamWork",
+     "Best coffee ever ☕! This place is a hidden gem 💎 #NapoliVibes",
 ...
 ]
 
@@ -76,9 +76,9 @@ categories = ['hobby', 'work', 'tourism', ...]
 p = train_pipeline(texts=texts, categories=categories, batch_size=5000, saving_directory=io_utils.DEFAULT_MODELS_PATH.joinpath('new_model'))
 
 predicting_texts = [
-    "Sunset in Santorini is unreal 🌅💕 Definitely coming back here! #travel #Greece",
-    "Client presentation went well! Fingers crossed for the deal 🤞 #careergoals",           
-    "Exploring the Amalfi Coast on a Vespa 🚀 #ItalianAdventure #wanderlust",               
+     "Sunset in Santorini is unreal 🌅💕 Definitely coming back here! #travel #Greece",
+     "Client presentation went well! Fingers crossed for the deal 🤞 #careergoals",           
+     "Exploring the Amalfi Coast on a Vespa 🛵 #ItalianAdventure #wanderlust",               
 ]
 
 predictions = predict_pipeline(pipeline=p, texts=predicting_texts, save=False) #PREDICTIONS FROM ALREADY TRAINED MODEL
@@ -91,8 +91,8 @@ print(predictions)
 from features_extraction_and_classification.feature_extraction import extract_features
 
 texts = [
-    "Back-to-back meetings today, barely had time for lunch. 😩 #grindmode",                 
-    "Spent all afternoon sketching — nothing beats that creative flow ✍️ #artlife",
+     "Back-to-back meetings today, barely had time for lunch. 😩 #grindmode"                 
+     "Spent all afternoon sketching — nothing beats that creative flow #artlife",
     ...
 ]
 
@@ -101,4 +101,3 @@ features = extract_features(texts=texts, batch_size=500, save=True, saving_direc
 features = extract_features(resume_dir='path/to/save')
 
 ```
-
