@@ -4,13 +4,13 @@ import pandas as pd
 import numpy as np
 from unidecode import unidecode
 
-import default_config
-from text_processing.text_replacement import replace_features_in_text, __replace_features_from_raw_text__
-from text_processing.raw_text_features_extraction import extract_emojis, extract_emoticons, extract_mentions, extract_repeated_punctuation_marks, extract_url
+from ReddiCompass import default_config
+from ReddiCompass.text_processing.text_replacement import replace_features_in_text, __replace_features_from_raw_text__
+from ReddiCompass.text_processing.raw_text_features_extraction import extract_emojis, extract_emoticons, extract_mentions, extract_repeated_punctuation_marks, extract_url
 #from feature_extraction import search_badwords_tokens_greedy
-from text_processing.LexiconMatcher import LexiconMatcher
-from text_processing.text_utils import is_upper_word
-from utils import flatten
+from ReddiCompass.text_processing.LexiconMatcher import LexiconMatcher
+from ReddiCompass.text_processing.text_utils import is_upper_word
+from ReddiCompass.utils import flatten
 
 from nltk.tokenize import TweetTokenizer
 from nltk.tokenize import TreebankWordDetokenizer

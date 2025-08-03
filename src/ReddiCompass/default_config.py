@@ -1,5 +1,5 @@
 import os
-from utils import get_package_root
+from ReddiCompass.utils import get_package_root
 
 _curr_root = get_package_root()
 word2vec_model_filename = _curr_root.joinpath("data/word2vec_twitter_model.bin")

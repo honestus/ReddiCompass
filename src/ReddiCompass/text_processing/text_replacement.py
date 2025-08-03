@@ -1,4 +1,4 @@
-import default_config
+from ReddiCompass import default_config
 import numpy as np
 import pandas as pd
 import re

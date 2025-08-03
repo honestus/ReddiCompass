@@ -1,12 +1,12 @@
 import pandas as pd
 import numpy as np
-from features_extraction_and_classification.feature_extraction import _extract_features_in_batches
-import features_extraction_and_classification.io_utils as io_utils
-import features_extraction_and_classification.resume_utils as resume_utils
-from features_extraction_and_classification.resume_utils import validate_meta_file, store_meta_file, is_valid_resume_dir, _is_features_extraction_finished_, is_model_train_finished, is_normalization_finished, is_pipeline_stored, get_processed_features, resume_extract_features
-from features_extraction_and_classification.validate_utils import validate_x_y_inputs, to_resume_flag, validate_tfidf_user_inputs, validate_tfidf_parameters, validate_text_input, validate_batch_size
-from features_extraction_and_classification.tfidf_utils import get_default_tfidf_extractor, get_ngram_topk_from_tfidf_extractor
-from features_extraction_and_classification.model_pipeline import SavingPipeline, FeatureExtractor
+from ReddiCompass.features_extraction_and_classification.feature_extraction import _extract_features_in_batches
+import ReddiCompass.features_extraction_and_classification.io_utils as io_utils
+import ReddiCompass.features_extraction_and_classification.resume_utils as resume_utils
+from ReddiCompass.features_extraction_and_classification.resume_utils import validate_meta_file, store_meta_file, is_valid_resume_dir, _is_features_extraction_finished_, is_model_train_finished, is_normalization_finished, is_predictions_finished, is_pipeline_stored, get_processed_features, resume_extract_features
+from ReddiCompass.features_extraction_and_classification.validate_utils import validate_x_y_inputs, to_resume_flag, validate_tfidf_user_inputs, validate_tfidf_parameters, validate_text_input, validate_batch_size
+from ReddiCompass.features_extraction_and_classification.tfidf_utils import get_default_tfidf_extractor, get_ngram_topk_from_tfidf_extractor
+from ReddiCompass.features_extraction_and_classification.model_pipeline import SavingPipeline, FeatureExtractor
 from sklearn.base import BaseEstimator
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.svm import LinearSVC
@@ -33,7 +33,7 @@ import shutil
 """
 
 
-def train_pipeline(texts: str | list[str] | pd.Series, categories: np.ndarray | pd.Series | list, extract_tfidf: bool = True, ngram_range: tuple[int,int] = None, top_k: int = None, scaler: BaseEstimator = MinMaxScaler(), clf: BaseEstimator = LinearSVC(), batch_size: int = -1, save: bool = True, saving_directory: str = None, resume_dir: str = None, raise_errors_on_wrong_indexes: bool = False):
+def train_pipeline(texts: str | list[str] | pd.Series = None, categories: np.ndarray | pd.Series | list = None, extract_tfidf: bool = True, ngram_range: tuple[int,int] = None, top_k: int = None, scaler: BaseEstimator = MinMaxScaler(), clf: BaseEstimator = LinearSVC(), batch_size: int = -1, save: bool = True, saving_directory: str = None, resume_dir: str = None, raise_errors_on_wrong_indexes: bool = False):
     if to_resume_flag(resume_dir):
         if is_pipeline_stored(resume_dir):
             print('Pipeline was already successfully stored')
@@ -84,6 +84,8 @@ def train_pipeline(texts: str | list[str] | pd.Series, categories: np.ndarray | 
 
 
     else:     ##FRESH NEW RUN, NO RESUMING
+        if texts is None or categories is None:
+            raise ValueError("No resume directory provided. To train a new model from scratch, please provide valid 'texts' and 'categories' inputs.")
         if any(not isinstance(obj, BaseEstimator) for obj in [scaler, clf]):
             raise TypeError('Wrong model types in input. They must be sklearn estimators')
         texts = validate_text_input(texts)
@@ -123,6 +125,7 @@ def train_pipeline(texts: str | list[str] | pd.Series, categories: np.ndarray | 
         store_meta_file(meta_obj, saving_dir=saving_directory) ##Storing meta parameters
         
         pipeline['features_extractor'].fit(X=texts, y=categories)
+        io_utils.save_model(obj=pipeline['features_extractor'].tfidf_extractor, filename_path=pipeline.saving_directory+f'/{io_utils.TFIDF_EXTRACTOR_FILENAME}', validate_input=False)
         io_utils.save_model(pipeline['features_extractor'], filename_path=pipeline.saving_directory+f'/{io_utils.FEATURE_EXTRACTOR_FILENAME}', validate_input=False)
 
         X_feats = pipeline['features_extractor'].transform(X=texts, saving_directory=pipeline.saving_directory, batch_size=batch_size)
@@ -135,14 +138,14 @@ def train_pipeline(texts: str | list[str] | pd.Series, categories: np.ndarray | 
     io_utils.save_model(pipeline, filename_path=pipeline.saving_directory+f'/{io_utils.PIPELINE_FILENAME}', validate_input=False)
     return pipeline
 
-def predict_pipeline(texts: str | list[str] | pd.Series, pipeline: SavingPipeline, save: bool = False, saving_directory: str = None, resume_dir: str = None, batch_size: int = -1):
+def predict_pipeline(texts: str | list[str] | pd.Series = None, pipeline: SavingPipeline = None, save: bool = False, saving_directory: str = None, resume_dir: str = None, batch_size: int = -1):
     import warnings
     from sklearn.utils.validation import check_is_fitted
     from sklearn.exceptions import NotFittedError
     
     if to_resume_flag(resume_dir):
         if is_predictions_finished(resume_dir):
-            print('Prediction was already succesfully completed')
+            print('Prediction was already successfully completed')
             predictions = pd.read_parquet(resume_dir+f'/{io_utils.PREDICTIONS_FILENAME}')
             return predictions
         if not is_valid_resume_dir(resume_dir):
@@ -163,6 +166,8 @@ def predict_pipeline(texts: str | list[str] | pd.Series, pipeline: SavingPipelin
 
 
     else: ##new run - no resume
+        if texts is None or pipeline is None:
+            raise ValueError("No resume directory provided. To run new predictions, please provide the 'texts' to predict on and the previously trained model pipeline.")
         if not isinstance(pipeline, SavingPipeline):
             raise TypeError('Input pipeline must be a SavingPipeline object')
         try:
@@ -247,6 +252,9 @@ def train(texts: list|pd.Series = None, categories: list|pd.Series = None, save:
         
         
     else: ##NEW MODEL - FRESH RUN
+        if texts is None or categories is None:
+            raise ValueError("No resume directory provided. To train a new model from scratch, please provide valid 'texts' and 'categories' inputs.")
+ 
         texts = validate_text_input(texts)
         texts, categories = validate_x_y_inputs(x=texts, y=categories) if raise_errors_on_wrong_indexes is None else validate_x_y_inputs(x=texts, y=categories, raise_errors_on_wrong_indexes=raise_errors_on_wrong_indexes)
         if (batch_size:=validate_batch_size(batch_size))==-1:
@@ -320,7 +328,7 @@ def predict(texts:  list|pd.Series = None , model_dir: str = None, save: bool = 
         if not is_valid_resume_dir(resume_dir):
             raise ValueError('Cannot resume from chosen resume directory')
         if is_predictions_finished(resume_dir):
-            print('Prediction was already succesfully completed')
+            print('Prediction was already successfully completed')
             predictions = pd.read_parquet(resume_dir+f'/{io_utils.PREDICTIONS_FILENAME}')
             return predictions
         
@@ -341,6 +349,8 @@ def predict(texts:  list|pd.Series = None , model_dir: str = None, save: bool = 
         tfidf_extractor = io_utils.load_model(filename_path=resume_dir + f'/{io_utils.TFIDF_EXTRACTOR_FILENAME}')
             
     else:
+        if texts is None or model_dir is None:
+            raise ValueError("No resume directory provided. To run new predictions, please provide the 'texts' to predict on and the previously trained model' directory.")
         texts = pd.Series(validate_text_input(texts))
         if (batch_size:=validate_batch_size(batch_size))==-1:
             batch_size = len(texts)
@@ -368,7 +378,7 @@ def predict(texts:  list|pd.Series = None , model_dir: str = None, save: bool = 
             saving_directory=False
             
         features = _extract_features_in_batches(texts, extract_tfidf=True, tfidf_extractor=tfidf_extractor, fit_tfidf=False, batch_size=batch_size, saving_directory=saving_directory)
-        print('Features extracted correctly')
+        #print('Features extracted correctly')
     
     
     scaler = io_utils.load_model(model_dir + f'/{io_utils.SCALER_FILENAME}')
@@ -376,6 +386,7 @@ def predict(texts:  list|pd.Series = None , model_dir: str = None, save: bool = 
     
     model = io_utils.load_model(model_dir + f'/{io_utils.MODEL_FILENAME}')
     predictions = model.predict(x_test)
+    print("Finished to predict")
     
     if save:
         pd.DataFrame(predictions, columns=['predictions']).set_index(pd.DataFrame(texts).index).to_parquet(saving_directory +f'/{io_utils.PREDICTIONS_FILENAME}', index=True)

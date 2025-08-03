@@ -1,14 +1,15 @@
 import pandas as pd
 import numpy as np
 import emosent, warnings
-from utils import flatten, filter_list
+from ReddiCompass.utils import flatten, filter_list
 from nltk import ne_chunk , pos_tag#, word_tokenize, 
 from nltk.corpus import wordnet
 from pattern.en import sentiment as pattern_sentiment
 from pattern.en import modality
-from text_processing.textractor import TexTractor
-from text_processing.text_replacement import replace_features_in_text
-import default_config, features_extraction_and_classification.default_resources as default_resources
+from ReddiCompass.text_processing.textractor import TexTractor
+from ReddiCompass.text_processing.text_replacement import replace_features_in_text
+from ReddiCompass import default_config
+import ReddiCompass.features_extraction_and_classification.default_resources as default_resources
 
 
 """

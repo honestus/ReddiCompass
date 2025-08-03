@@ -1,11 +1,11 @@
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.pipeline import Pipeline
-from features_extraction_and_classification.tfidf_utils import get_default_tfidf_extractor, get_ngram_topk_from_tfidf_extractor
-from features_extraction_and_classification.feature_extraction import extract_features, _extract_features_in_batches
-from features_extraction_and_classification.validate_utils import to_resume_flag
-from features_extraction_and_classification.resume_utils import validate_meta_file, resume_extract_features
-from text_processing.text_filtering_utils import get_nonstopwords_tokens
-from features_extraction_and_classification import io_utils as io_utils
+from ReddiCompass.features_extraction_and_classification.tfidf_utils import get_default_tfidf_extractor, get_ngram_topk_from_tfidf_extractor
+from ReddiCompass.features_extraction_and_classification.feature_extraction import extract_features, _extract_features_in_batches
+from ReddiCompass.features_extraction_and_classification.validate_utils import to_resume_flag
+from ReddiCompass.features_extraction_and_classification.resume_utils import validate_meta_file, resume_extract_features
+from ReddiCompass.text_processing.text_filtering_utils import get_nonstopwords_tokens
+from ReddiCompass.features_extraction_and_classification import io_utils as io_utils
 
 # Custom est
 class FeatureExtractor(BaseEstimator, TransformerMixin):
@@ -131,6 +131,6 @@ class SavingPipeline(Pipeline):
             
             saving_directory = io_utils.__get_new_directory__(parent_dir=def_path)  
         else:
-            saving_directory = io_utils.__validate_new_dir__(new_dir=saving_directory, force_to_default_path=False, funct='train')
+            saving_directory = io_utils.__validate_new_dir__(dirpath=saving_directory, force_to_default_path=False, funct='train')
 
         return str(saving_directory)

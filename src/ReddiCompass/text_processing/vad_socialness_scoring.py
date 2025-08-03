@@ -1,4 +1,4 @@
-from text_processing.LexiconMatcher import LexiconMatcher
+from ReddiCompass.text_processing.LexiconMatcher import LexiconMatcher
     
 import pandas as pd
 import numpy as np
@@ -7,7 +7,7 @@ from nltk.stem import WordNetLemmatizer
 from numpy import interp
 import numbers
 from typing import Sequence
-from utils import flatten
+from ReddiCompass.utils import flatten
 
 
 class NRCVad(LexiconMatcher):

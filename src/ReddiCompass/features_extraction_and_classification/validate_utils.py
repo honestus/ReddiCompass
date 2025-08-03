@@ -94,13 +94,13 @@ def validate_x_y_inputs(x, y, check_order=True, to_pandas_series = True, raise_e
   
   
 def __is_valid_single_text__(text):
-    from text_processing.textractor import TexTractor
+    from ReddiCompass.text_processing.textractor import TexTractor
     if not isinstance(text, (str, TexTractor)):
         return -1
     return bool(text)
   
 def validate_text_input(texts):
-    from text_processing.textractor import TexTractor
+    from ReddiCompass.text_processing.textractor import TexTractor
     if isinstance(texts, (str, TexTractor)):
         if not __is_valid_single_text__(texts):
             raise ValueError('Input text must be non-empty')
@@ -143,7 +143,7 @@ def validate_tfidf_user_inputs(extract_tfidf: bool, fit_tfidf: bool, tfidf_extra
         #ngram_range, top_k = False, False 
 
 def validate_tfidf_parameters(extract_tfidf: bool, fit_tfidf: bool, tfidf_extractor: BaseEstimator, y: list|np.ndarray|pd.Series = None):
-    from features_extraction_and_classification.tfidf_utils import get_ngram_topk_from_tfidf_extractor
+    from ReddiCompass.features_extraction_and_classification.tfidf_utils import get_ngram_topk_from_tfidf_extractor
     from sklearn.utils.validation import check_is_fitted
 
     if not extract_tfidf:

@@ -1,5 +1,5 @@
-from text_processing.textractor import TexTractor
-from text_processing.text_replacement import replace_features_in_text
+from ReddiCompass.text_processing.textractor import TexTractor
+from ReddiCompass.text_processing.text_replacement import replace_features_in_text
 
 def get_nonstopwords_tokens(text: str | TexTractor, remove_features_tokens=True, stopwords=[]):
     text = TexTractor(text).process()

@@ -1,10 +1,10 @@
 from pathlib import Path
 import json
 import pandas as pd
-from utils import get_columns_from_parquet_file
-from features_extraction_and_classification.io_utils import get_stored_features_files, get_stored_tokens_files, get_whole_filelist
-import features_extraction_and_classification.io_utils as io_utils
-from default_config import ALL_FEATURES_COLUMNS, TFIDF_FEATURES_NAMES_LIKE
+from ReddiCompass.utils import get_columns_from_parquet_file
+from ReddiCompass.features_extraction_and_classification.io_utils import get_stored_features_files, get_stored_tokens_files, get_whole_filelist
+import ReddiCompass.features_extraction_and_classification.io_utils as io_utils
+from ReddiCompass.default_config import ALL_FEATURES_COLUMNS, TFIDF_FEATURES_NAMES_LIKE
 
 
 
@@ -130,13 +130,13 @@ def get_processed_tfidf_tokens(resume_dir, index_only=False):
     
     
 def get_processed_predictions(resume_dir, index_only=False):
-    if (prediction_file:=Path(resume_dir.joinpath(io_utils.PREDICTIONS_FILENAME)) ).exists():
+    if (prediction_file:=Path(resume_dir).joinpath(io_utils.PREDICTIONS_FILENAME) ).exists():
         predictions = pd.read_parquet(prediction_file, columns=[] if index_only else None)
         return predictions.index if index_only else predictions
     return pd.Series()
     
 def get_original_texts(resume_dir, index_only=False):
-    if (texts_file:=Path(resume_dir.joinpath(io_utils.TEXTS_FILENAME)) ).exists():
+    if (texts_file:=Path(resume_dir).joinpath(io_utils.TEXTS_FILENAME) ).exists():
         texts = pd.read_parquet(texts_file, columns=[] if index_only else None)
         return texts.index if index_only else texts
     raise ValueError('No texts file on the current directory')
@@ -168,14 +168,14 @@ def is_model_train_finished(resume_dir, funct: str):
     
     
 def _is_predictions_finished_from_predictions(curr_predictions: pd.Series, expected_all_predictions_index: pd.Index) -> bool:
-    if len(curr_predictions)==len(expected_all_predictions):
+    if len(curr_predictions)==len(expected_all_predictions_index):
         if sorted(curr_predictions.index)==sorted(expected_all_predictions_index):
             return True
     return False
     
 def is_predictions_finished(resume_dir):
     curr_predictions = get_processed_predictions(resume_dir)
-    all_texts_indexes = pd.read_parquet(io_utils.TEXTS_FILENAME)
+    all_texts_indexes = pd.read_parquet(Path(resume_dir).joinpath(io_utils.TEXTS_FILENAME), columns=[]).index
     return _is_predictions_finished_from_predictions(curr_predictions, all_texts_indexes)
     
 def is_normalization_finished(resume_dir: str, funct: str):
@@ -193,8 +193,8 @@ def is_pipeline_stored(resume_dir: str):
    
     
 def resume_extract_features(resume_dir):
-    from features_extraction_and_classification.feature_extraction import _extract_features_in_batches
-    from features_extraction_and_classification.tfidf_utils import get_default_tfidf_extractor
+    from ReddiCompass.features_extraction_and_classification.feature_extraction import _extract_features_in_batches
+    from ReddiCompass.features_extraction_and_classification.tfidf_utils import get_default_tfidf_extractor
     if not is_valid_resume_dir(resume_dir):
         raise ValueError('Cannot resume from chosen resume directory: missing meta file or original texts file.')
     resume_dir = Path(resume_dir)
@@ -209,7 +209,7 @@ def resume_extract_features(resume_dir):
     if funct=='extract_features':
         extract_tfidf_bool = meta[TFIDF_BOOL_ATTRIBUTE]
     else:
-        extract_tfidf_bool = True ###TO CHANGE IF WE WANT TO ADD IT AS OPTIONAL DURING TRAIN/TEST
+        extract_tfidf_bool = meta[TFIDF_BOOL_ATTRIBUTE]#True ###TO CHANGE IF WE WANT TO ADD IT AS OPTIONAL DURING TRAIN/TEST
     
     columns_to_check_in_stored_features_dataframe = ALL_FEATURES_COLUMNS + ([] if not extract_tfidf_bool else [TFIDF_FEATURES_NAMES_LIKE.format('0')])
     if __is_features_extraction_finished_from_processed_features__(processed_features=processed_features, expected_all_features_index=orig_texts.index, expected_columns=columns_to_check_in_stored_features_dataframe): 
@@ -242,16 +242,19 @@ def resume_extract_features(resume_dir):
     else:
         raise NotImplementedError('Invalid resume_dir, it must be either a previously stored directory from train,  predict, or extract_features')
     
-    if processed_tokens.empty or processed_features.empty:        
+    if processed_tokens.empty or processed_features.empty:
+        print(f"Resuming features extraction --- No previously stored features files")        
         if funct=='train':
             return _extract_features_in_batches(texts=orig_texts[io_utils.TEXT_NAME_IN_STORED_DF], categories=orig_texts[io_utils.CATEGORY_NAME_IN_STORED_DF], 
-            batch_size=batch_size, 
+            extract_tfidf = extract_tfidf_bool,
             tfidf_extractor=tfidf_extractor, 
             fit_tfidf=True, 
             ngram_range=ngram_range,
+            batch_size=batch_size, 
             saving_directory=str(resume_dir))
         elif funct=='predict':
             return _extract_features_in_batches(texts=orig_texts[io_utils.TEXT_NAME_IN_STORED_DF], 
+            extract_tfidf = extract_tfidf_bool,
             tfidf_extractor=tfidf_extractor, 
             fit_tfidf=False, 
             batch_size=batch_size, 

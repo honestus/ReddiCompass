@@ -5,12 +5,12 @@ import numpy as np
 import emoji, emosent
 from emoji.tokenizer import tokenize as emoji_tokenize
 import gc
-import default_config
+from ReddiCompass import default_config
 from textblob import TextBlob
 import nltk
 from nltk.tokenize import TreebankWordDetokenizer
-from utils import flatten
-from text_processing.text_replacement import replace_features_in_text
+from ReddiCompass.utils import flatten
+from ReddiCompass.text_processing.text_replacement import replace_features_in_text
 from typing import Sequence
 
 

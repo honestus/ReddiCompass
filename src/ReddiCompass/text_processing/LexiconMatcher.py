@@ -1,7 +1,7 @@
 import warnings
 import pandas as pd
 import numpy as np
-from utils import flatten
+from ReddiCompass.utils import flatten
 from typing import Sequence
 
 

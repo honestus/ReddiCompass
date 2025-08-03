@@ -1,13 +1,13 @@
 import pandas as pd
 import numpy as np
-import default_config
-import features_extraction_and_classification.default_resources as default_resources
-from text_processing.text_utils import get_wordnet_pos
-from text_processing.textractor import TexTractor
-from text_processing.text_replacement import replace_features_in_text
-from text_processing.LexiconMatcher import LexiconMatcher
-from features_extraction_and_classification.contextual_features_extraction import *
-from features_extraction_and_classification.validate_utils import validate_text_input, validate_batch_size
+from ReddiCompass import default_config
+import ReddiCompass.features_extraction_and_classification.default_resources as default_resources
+from ReddiCompass.text_processing.text_utils import get_wordnet_pos
+from ReddiCompass.text_processing.textractor import TexTractor
+from ReddiCompass.text_processing.text_replacement import replace_features_in_text
+from ReddiCompass.text_processing.LexiconMatcher import LexiconMatcher
+from ReddiCompass.features_extraction_and_classification.contextual_features_extraction import *
+from ReddiCompass.features_extraction_and_classification.validate_utils import validate_text_input, validate_batch_size
 
 
 
@@ -179,7 +179,7 @@ categories: list|np.ndarray|pd.Series = None,
 saving_directory: str = None, already_processed_features_batches=None,
 already_processed_tokens_batches=None, **kwargs):
     
-    import os, features_extraction_and_classification.io_utils as io_utils
+    import os, ReddiCompass.features_extraction_and_classification.io_utils as io_utils
         
     features, tfidf_tokens = None, None
     if already_processed_features_batches is not None:
@@ -238,12 +238,12 @@ already_processed_tokens_batches=None, **kwargs):
 
 
 def extract_features(texts: str | list[str] = None, extract_tfidf: bool = False, tfidf_extractor: sklearn.base.BaseEstimator = None, fit_tfidf: bool = False, categories: list|np.ndarray|pd.Series = None, save: bool = False, saving_directory: str = None, resume_dir: str = None, batch_size: int = -1, raise_errors_on_wrong_indexes: bool = False, **kwargs):
-    from features_extraction_and_classification.io_utils import prepare_new_directory
-    import features_extraction_and_classification.io_utils as io_utils
-    import features_extraction_and_classification.resume_utils as resume_utils
-    from features_extraction_and_classification.resume_utils import store_meta_file, validate_meta_file, resume_extract_features, _is_features_extraction_finished_
-    from features_extraction_and_classification.validate_utils import validate_x_y_inputs, to_resume_flag, validate_tfidf_user_inputs, validate_tfidf_parameters
-    from features_extraction_and_classification.tfidf_utils import get_default_tfidf_extractor, get_ngram_topk_from_tfidf_extractor
+    from ReddiCompass.features_extraction_and_classification.io_utils import prepare_new_directory
+    import ReddiCompass.features_extraction_and_classification.io_utils as io_utils
+    import ReddiCompass.features_extraction_and_classification.resume_utils as resume_utils
+    from ReddiCompass.features_extraction_and_classification.resume_utils import store_meta_file, validate_meta_file, resume_extract_features, _is_features_extraction_finished_
+    from ReddiCompass.features_extraction_and_classification.validate_utils import validate_x_y_inputs, to_resume_flag, validate_tfidf_user_inputs, validate_tfidf_parameters
+    from ReddiCompass.features_extraction_and_classification.tfidf_utils import get_default_tfidf_extractor, get_ngram_topk_from_tfidf_extractor
     from sklearn.base import clone
     from pathlib import Path
 

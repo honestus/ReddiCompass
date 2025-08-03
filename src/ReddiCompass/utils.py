@@ -97,10 +97,8 @@ def get_package_root():
     from pathlib import Path
     
     current_file = __file__
-    path = Path(current_file).resolve()
+    path = Path(current_file).resolve().parent
 
-    while not (path / '.git').exists() and path != path.parent:
-        path = path.parent
     return path
     
 """

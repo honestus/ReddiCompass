@@ -1,4 +1,4 @@
-import default_config
+from ReddiCompass import default_config
 _spacy_nlp = None
 _word2vec_model = None
 _stopwords = None
@@ -36,7 +36,7 @@ def get_spacy_nlp():
 def __load_word2vec_model__(model_path):
     from gensim.models import KeyedVectors
     from pathlib import Path
-    from download_utils import download_from_huggingface
+    from ReddiCompass.download_utils import download_from_huggingface
         
     model_path = Path(model_path)
     if not model_path.exists():
@@ -47,7 +47,7 @@ def __load_word2vec_model__(model_path):
 
 
 def get_frameaxis_instance():
-    from Moral_Foundations_Frameaxis.frameAxis import FrameAxis
+    from ReddiCompass.Moral_Foundations_Frameaxis.frameAxis import FrameAxis
     global _word2vec_model
     global _frameaxis
     if _frameaxis is None:
@@ -80,7 +80,7 @@ def get_vader_analyzer():
     
     
 def get_socialness_extractor():
-    from text_processing.vad_socialness_scoring import SocialnessCalculator
+    from ReddiCompass.text_processing.vad_socialness_scoring import SocialnessCalculator
     global _socialness_extractor
     if _socialness_extractor is None:
         _socialness_extractor = SocialnessCalculator(str(default_config.social_lexicon_filename), min_max=(0,1), expand_lexicon=True, limit_expansion=True)
@@ -89,7 +89,7 @@ def get_socialness_extractor():
     
     
 def get_vad_extractor():
-    from text_processing.vad_socialness_scoring import NRCVad
+    from ReddiCompass.text_processing.vad_socialness_scoring import NRCVad
     global _vad_extractor
     if _vad_extractor is None:
         _vad_extractor = NRCVad(str(default_config.vad_lexicon_filename), expand_lexicon=True, limit_expansion=True, min_max=(-1,1))

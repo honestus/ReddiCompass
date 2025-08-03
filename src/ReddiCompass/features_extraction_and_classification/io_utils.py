@@ -1,6 +1,6 @@
 import os, glob, joblib, shutil
 from pathlib import Path
-from utils import get_package_root
+from ReddiCompass.utils import get_package_root
 
 
     
@@ -261,7 +261,7 @@ def __get_model_type_name_mapping__():
     from sklearn.preprocessing import MinMaxScaler
     from sklearn.feature_extraction.text import TfidfVectorizer
     from sklearn.base import BaseEstimator
-    from features_extraction_and_classification.model_pipeline import SavingPipeline, FeatureExtractor
+    from ReddiCompass.features_extraction_and_classification.model_pipeline import SavingPipeline, FeatureExtractor
     
     global __TYPE_FILENAME_MAP__ 
     if __TYPE_FILENAME_MAP__ is None:
