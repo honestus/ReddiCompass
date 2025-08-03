@@ -3,9 +3,9 @@ recursive-include data *
 
 # Exclude dev and build artifacts
 recursive-exclude jupyter_files *
-recursive-exclude src/test *
+recursive-exclude src/ReddiCompass/test *
 recursive-exclude */__pycache__ *
-recursive-exclude * .ipynb_checkpoints
+recursive-exclude *.ipynb_checkpoints
 exclude readme_virtenv.txt
 exclude data/word2vec_twitter_model.bin
 

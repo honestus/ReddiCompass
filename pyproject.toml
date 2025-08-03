@@ -2,6 +2,11 @@
 requires = ["setuptools>=77.0.3", "wheel"]
 build-backend = "setuptools.build_meta"
 
+[tool.setuptools]
+include-package-data = true
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ReddiCompass*", "ReddiCompass.*"]#, "ReddiCompass.text_processing", "ReddiCompass.features_extraction_and_classification"]
 
 
 [project]
@@ -13,28 +18,15 @@ readme = {file = "README.md", content-type = "text/markdown"}
 authors = [
 {name="Giuseppe Onesto", email = "onesto.giuseppe@gmail.com"}
 ]
+#py_modules = ["default_config.py", "utils.py", "download_utils.py"]
 requires-python = ">=3.7,<3.12"
 
 dependencies = [
-    "pandas>=2.3.1",
-    "numpy>=1.26.4",
+    "numpy==1.24.4",
+    "pandas==1.5.3",
+	 "scipy==1.10.1",
     "scikit-learn==1.6.1",
-    "scipy<1.13",
-    "eng-spacysentiment",
-    "emoji==2.14.1",
-    "unidecode",
-    "vaderSentiment==3.3.2",
-    "emosent-py==0.1.7",
-    "nltk==3.9.1",
-    "detoxify",
-    "textblob==0.19.0",
-    "validators==0.35.0",
-    "tldextract",
-    "pyarrow",
-    "gensim",
-    "spacy",
-    "nrclex @ git+https://github.com/honestus/NRCLex.git",
-    "Pattern @ git+https://github.com/NicolasBizzozzero/pattern@66ab34453a3443c06a4ebda092c8d1947c83b17a"
+	"nltk==3.9.1",
 ]
 
 keywords = ["reddit", "SMN", "social", "network", "NLP", "PoliticalCompass", "TexTractor", "text", "extraction", "language", "natural", "twitter", "hashtag", "emoji", "mention", "lexicon", "lexical", "textual", "feature"]
@@ -50,9 +42,3 @@ classifiers = [
 Homepage = "https://github.com/honestus/ReddiCompass"
 
 
-[tool.setuptools.packages.find]
-where = ["src/"]
-include = ["ReddiCompass.text_processing", "ReddiCompass.features_extraction_and_classification"]
-
-[tool.setuptools.package-data]
-ReddiCompass = ['data/*']
