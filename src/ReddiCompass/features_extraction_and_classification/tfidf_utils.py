@@ -88,13 +88,13 @@ def get_default_tfidf_extractor(ngram_range: tuple[int,int]=DEFAULT_NGRAM_RANGE,
     if top_k is False: ###Pipeline without tokens selection
         #raise NotImplementedError('Pipeline without chi-square, might be interesting for different purposes')
         tfidf_extractor = Pipeline([
-        ('vectorizer', CountVectorizer(tokenizer=do_nothing, preprocessor=do_nothing, ngram_range=ngram_range)),  # frequencies
+        ('vectorizer', CountVectorizer(tokenizer=do_nothing, preprocessor=do_nothing, token_pattern=None, ngram_range=ngram_range)),  # frequencies
         ('tfidf', TfidfTransformer()),  # tfidf
     ])
         return tfidf_extractor
     elif isinstance(top_k, int) and top_k>0:
         tfidf_extractor = Pipeline([
-        ('vectorizer', CountVectorizer(tokenizer=do_nothing, preprocessor=do_nothing, ngram_range=ngram_range)),  # frequencies
+        ('vectorizer', CountVectorizer(tokenizer=do_nothing, preprocessor=do_nothing, token_pattern=None, ngram_range=ngram_range)),  # frequencies
         ('tfidf', TfidfTransformer()),  # tfidf
         ('kbest', SelectKBest(score_func=chi2, k=top_k)), #most discriminative tokens' selection
     ])

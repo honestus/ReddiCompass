@@ -118,10 +118,14 @@ def validate_text_input(texts):
   
     
 def to_resume_flag(resume_dir):
+    from pathlib import Path
     if resume_dir in [None, False, 0]:
         return False
-
-    warn_msg = f"Resuming from '{resume_dir}': all other input parameters will be ignored."
+    try:
+        resume_dir = Path(resume_dir).resolve()
+    except TypeError:
+        raise TypeError('Wrong resume_dir in input')
+    warn_msg = f"Resuming from '{resume_dir.absolute()}': all other input parameters will be ignored."
     warnings.warn(warn_msg, UserWarning)
     return True
 

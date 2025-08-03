@@ -17,11 +17,17 @@ prune src/ReddiCompass/data/rundata
 include src/ReddiCompass/data/rundata/models/.default/model.joblib
 include src/ReddiCompass/data/rundata/models/.default/scaler.joblib
 include src/ReddiCompass/data/rundata/models/.default/tfidf_extractor.joblib
+include src/ReddiCompass/data/rundata/models/.default/features_extractor.joblib
+include src/ReddiCompass/data/rundata/models/.default/pipeline.joblib
 
 include src/ReddiCompass/data/rundata/models/.default/horizontal/model.joblib
 include src/ReddiCompass/data/rundata/models/.default/horizontal/scaler.joblib
 include src/ReddiCompass/data/rundata/models/.default/horizontal/tfidf_extractor.joblib
+include src/ReddiCompass/data/rundata/models/.default/horizontal/features_extractor.joblib
+include src/ReddiCompass/data/rundata/models/.default/horizontal/pipeline.joblib
 
 include src/ReddiCompass/data/rundata/models/.default/vertical/model.joblib
 include src/ReddiCompass/data/rundata/models/.default/vertical/scaler.joblib
 include src/ReddiCompass/data/rundata/models/.default/vertical/tfidf_extractor.joblib
+include src/ReddiCompass/data/rundata/models/.default/vertical/features_extractor.joblib
+include src/ReddiCompass/data/rundata/models/.default/vertical/pipeline.joblib

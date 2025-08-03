@@ -10,8 +10,7 @@ from ReddiCompass.features_extraction_and_classification.model_pipeline import S
 from sklearn.base import BaseEstimator
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.svm import LinearSVC
-
-
+from pathlib import Path
 import shutil
 """
  TO DO:
@@ -105,7 +104,7 @@ def train_pipeline(texts: str | list[str] | pd.Series = None, categories: np.nda
 
         #creating new dir if not already existing
         saving_directory = io_utils.prepare_new_directory(base_dir=saving_directory, force_to_default_path=False, funct='train')
-        print(f'Storing directory: {saving_directory}')
+        print(f'Storing directory: {Path(saving_directory).absolute()}')
         #STORING TEXTS AND CATEGORIES FOR POTENTIAL FUTURE RESUMES
         pd.DataFrame({io_utils.TEXT_NAME_IN_STORED_DF : texts, io_utils.CATEGORY_NAME_IN_STORED_DF : categories}).to_parquet(saving_directory + f'/{io_utils.TEXTS_FILENAME}', index=True)
 
@@ -183,7 +182,7 @@ def predict_pipeline(texts: str | list[str] | pd.Series = None, pipeline: Saving
         if save:
             saving_directory = pipeline._handle_saving_directory(save=save, saving_directory=saving_directory, funct='predict')
             saving_directory = io_utils.prepare_new_directory(base_dir=saving_directory, funct='predict')
-            print(f'Storing directory: {saving_directory}')
+            print(f'Storing directory: {Path(saving_directory).absolute()}')
             pd.DataFrame(texts.rename(io_utils.TEXT_NAME_IN_STORED_DF)).to_parquet(saving_directory + f'/{io_utils.TEXTS_FILENAME}', index=True)
     
             meta_obj = {}
@@ -282,7 +281,7 @@ def train(texts: list|pd.Series = None, categories: list|pd.Series = None, save:
                 saving_directory = io_utils.prepare_new_directory(base_dir=saving_directory, force_to_default_path=False, funct='train')
             
             
-            print(f'Storing directory: {saving_directory}')
+            print(f'Storing directory: {Path(saving_directory).absolute()}')
             pd.DataFrame({io_utils.TEXT_NAME_IN_STORED_DF : texts, io_utils.CATEGORY_NAME_IN_STORED_DF : categories}).to_parquet(saving_directory + f'/{io_utils.TEXTS_FILENAME}', index=True)
             io_utils.save_model(obj=tfidf_extractor, filename_path=saving_directory + f'/{io_utils.TFIDF_EXTRACTOR_FILENAME}')
             
@@ -315,7 +314,7 @@ def train(texts: list|pd.Series = None, categories: list|pd.Series = None, save:
    
     print('Model trained correctly')
     if save:
-        print(f'Saving to {saving_directory}')
+        print(f'Storing model...')
         io_utils.save_model(obj=scaler, filename_path=saving_directory + f'/{io_utils.SCALER_FILENAME}')
         io_utils.save_model(obj=model, filename_path=saving_directory + f'/{io_utils.MODEL_FILENAME}')
     return model
@@ -349,8 +348,8 @@ def predict(texts:  list|pd.Series = None , model_dir: str = None, save: bool = 
         tfidf_extractor = io_utils.load_model(filename_path=resume_dir + f'/{io_utils.TFIDF_EXTRACTOR_FILENAME}')
             
     else:
-        if texts is None or model_dir is None:
-            raise ValueError("No resume directory provided. To run new predictions, please provide the 'texts' to predict on and the previously trained model' directory.")
+        if texts is None:
+            raise ValueError("No resume directory provided. To run new predictions, please provide the 'texts' to predict on.")
         texts = pd.Series(validate_text_input(texts))
         if (batch_size:=validate_batch_size(batch_size))==-1:
             batch_size = len(texts)
@@ -358,13 +357,13 @@ def predict(texts:  list|pd.Series = None , model_dir: str = None, save: bool = 
             model_dir = str(io_utils.STANDARD_MODEL_PATH)
         else:
             model_dir = io_utils.validate_existing_model_dir(model_dir)
-        print(f'Current model directory of the model used for predicting: {model_dir}')
+        print(f'Current model directory of the model used for predicting: {Path(model_dir).absolute()}')
         tfidf_extractor = io_utils.load_model(model_dir + f'/{io_utils.TFIDF_EXTRACTOR_FILENAME}')
         
         
         if save:# or (batch_size and batch_size<len(texts)):
             saving_directory = io_utils.prepare_new_directory(parent_dir=model_dir + f'/{io_utils.PREDICTIONS_DIR}' + ('/tmp' if not save else ''), funct='predict')
-            print(f'Storing directory: {saving_directory}')
+            print(f'Storing directory: {Path(saving_directory).absolute()}')
             pd.DataFrame(texts.rename(io_utils.TEXT_NAME_IN_STORED_DF)).to_parquet(saving_directory + f'/{io_utils.TEXTS_FILENAME}', index=True)
             
             meta_obj = {}

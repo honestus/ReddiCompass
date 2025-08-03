@@ -202,7 +202,7 @@ def __validate_new_dir__(dirpath: str, force_to_default_path: bool = True, funct
 
 def prepare_new_directory(base_dir=None, parent_dir=None, force_to_default_path=False, funct=None):
     """
-    Creates and returns a new dir or validates an existing one.
+    Creates and returns a new dir after validating it.
     If base_dir: use it, otherwise creates a new numbered subdir inside parent_dir.
     """
     if base_dir is None and parent_dir is None:
@@ -210,7 +210,7 @@ def prepare_new_directory(base_dir=None, parent_dir=None, force_to_default_path=
 
     # Determine target dir
     curr_dir = Path(base_dir) if base_dir else __get_new_directory__(parent_dir)
-
+    curr_dir = curr_dir.resolve()
     # Validate (includes overwrite handling)
     curr_dir = Path(__validate_new_dir__(curr_dir, force_to_default_path=force_to_default_path, funct=funct, overwrite=False))
 

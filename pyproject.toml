@@ -54,6 +54,11 @@ classifiers = [
 	"Development Status :: 4 - Beta"
 ]
 
+[project.scripts]
+extract_features = "ReddiCompass.cli:run_extract_features"
+train_pipeline = "ReddiCompass.cli:run_train_pipeline"
+predict_pipeline = "ReddiCompass.cli:run_predict_pipeline"
+
 [project.urls]
 Homepage = "https://github.com/honestus/ReddiCompass"
 
