@@ -241,7 +241,7 @@ def extract_features(texts: str | list[str] = None, extract_tfidf: bool = False,
     from ReddiCompass.features_extraction_and_classification.io_utils import prepare_new_directory
     import ReddiCompass.features_extraction_and_classification.io_utils as io_utils
     import ReddiCompass.features_extraction_and_classification.resume_utils as resume_utils
-    from ReddiCompass.features_extraction_and_classification.resume_utils import store_meta_file, validate_meta_file, resume_extract_features, _is_features_extraction_finished_
+    from ReddiCompass.features_extraction_and_classification.resume_utils import store_meta_file, validate_meta_file, resume_extract_features, _is_features_extraction_finished_, is_running_function_feasible_with_resume_function, _is_valid_meta_dict_
     from ReddiCompass.features_extraction_and_classification.validate_utils import validate_x_y_inputs, to_resume_flag, validate_tfidf_user_inputs, validate_tfidf_parameters
     from ReddiCompass.features_extraction_and_classification.tfidf_utils import get_default_tfidf_extractor, get_ngram_topk_from_tfidf_extractor
     from sklearn.base import clone
@@ -309,6 +309,11 @@ def extract_features(texts: str | list[str] = None, extract_tfidf: bool = False,
         
     
     else: ##RESUMING
+        meta_obj = validate_meta_file(str(resume_dir)+f'/{io_utils.META_FILENAME}')
+        if not is_running_function_feasible_with_resume_function(running_funct='extract_features', resume_funct=meta_obj[resume_utils.FUNCTION_ATTRIBUTE]):
+            raise ValueError(f'Cannot resume feature extraction from a directory previously created to {meta_obj[resume_utils.FUNCTION_ATTRIBUTE]}')
+            
+        _is_valid_meta_dict_(meta_dict=meta_obj, running_funct='extract_features')
         features = resume_extract_features(resume_dir) ### IF WE HAVE TO RESUME, JUST USE RESUME_EXTRACT_FEATURES (handles all the needed checking for resuming and extracts features from unprocessed texts (if any)     
     
     

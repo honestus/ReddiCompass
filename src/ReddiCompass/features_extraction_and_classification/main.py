@@ -3,7 +3,7 @@ import numpy as np
 from ReddiCompass.features_extraction_and_classification.feature_extraction import _extract_features_in_batches
 import ReddiCompass.features_extraction_and_classification.io_utils as io_utils
 import ReddiCompass.features_extraction_and_classification.resume_utils as resume_utils
-from ReddiCompass.features_extraction_and_classification.resume_utils import validate_meta_file, store_meta_file, is_valid_resume_dir, _is_features_extraction_finished_, is_model_train_finished, is_normalization_finished, is_predictions_finished, is_pipeline_stored, get_processed_features, resume_extract_features
+from ReddiCompass.features_extraction_and_classification.resume_utils import validate_meta_file, store_meta_file, is_valid_resume_dir, _is_features_extraction_finished_, is_model_train_finished, is_normalization_finished, is_predictions_finished, is_pipeline_stored, get_processed_features, resume_extract_features, is_running_function_feasible_with_resume_function, _is_valid_meta_dict_
 from ReddiCompass.features_extraction_and_classification.validate_utils import validate_x_y_inputs, to_resume_flag, validate_tfidf_user_inputs, validate_tfidf_parameters, validate_text_input, validate_batch_size
 from ReddiCompass.features_extraction_and_classification.tfidf_utils import get_default_tfidf_extractor, get_ngram_topk_from_tfidf_extractor
 from ReddiCompass.features_extraction_and_classification.model_pipeline import SavingPipeline, FeatureExtractor
@@ -12,24 +12,6 @@ from sklearn.preprocessing import MinMaxScaler
 from sklearn.svm import LinearSVC
 from pathlib import Path
 import shutil
-"""
- TO DO:
- 1. APPLY LOGIC TO RESUME FROM PROPER PROCESSING CHECKPOINT
- IF MODEL NOT IN META...
-        IF SCALER NOT IN META...
-            CHECK IF FEATURES IN META... IF THAT, FEATURES=LOAD_FEATURES...
-             OTHERWISE LOAD CURRENT EXTRACTED FEATURES(IF ANY), AND START PROCESSING FROM NEXT TEXTS... BY USING TEXTS INDEXES (IN DF OR LIST... AS WE RE PROCESSING THEM IN SEQUENCE ORDER)...
-             KEEP SAVING, BY USING SAME BATCH_SIZE, FROM I=K+1...
-        ELSE:
-        SCALER = LOAD_MODEL(SCALER)
-    ELSE:
-        MODEL = LOAD_MODEL(SCALER)... AND WE'RE DONE IF TRAIN, OTHERWISE CHECK FOR PREDICTIONS IF FUNC=PREDICT
- 
- 2. APPLY SAME LOGIC WHEN SAVING (CREATE META FILE, SAVE IT, AND ADD THE 'FEATURES', 'SCALER', 'MODEL' ATTRIBUTES WHEN THAT PHASE CORRECTLY ENDS...
- 
- 3. CHECK THAT WHEN WE USE BATCH_SIZE, WE KEEP SAVING FROM K+1 AND NOT FROM 0... OTHERWISE WE'LL STORE ON ALREADY EXISTING FILES AND THEY'RE FOREVER GONE
- 
-"""
 
 
 def train_pipeline(texts: str | list[str] | pd.Series = None, categories: np.ndarray | pd.Series | list = None, extract_tfidf: bool = True, ngram_range: tuple[int,int] = None, top_k: int = None, scaler: BaseEstimator = MinMaxScaler(), clf: BaseEstimator = LinearSVC(), batch_size: int = -1, save: bool = True, saving_directory: str = None, resume_dir: str = None, raise_errors_on_wrong_indexes: bool = False):
@@ -40,10 +22,16 @@ def train_pipeline(texts: str | list[str] | pd.Series = None, categories: np.nda
         if not resume_utils.is_valid_resume_dir(resume_dir):
             raise ValueError(f'Cannot resume from {resume_dir}')
 
+        meta_obj = validate_meta_file(str(resume_dir)+f'/{io_utils.META_FILENAME}')
+        if not is_running_function_feasible_with_resume_function(running_funct='train_pipeline', resume_funct=meta_obj[resume_utils.FUNCTION_ATTRIBUTE]):
+            raise ValueError(f'Cannot resume training from a directory previously created to {meta_obj[resume_utils.FUNCTION_ATTRIBUTE]}')
+            
+        _is_valid_meta_dict_(meta_dict=meta_obj, running_funct='train_pipeline')
+        
         save = True
         saving_directory = resume_dir
         scaler, clf, extract_tfidf, ngram_range, top_k, texts, categories, batch_size = None, None, None, None, None, None, None, None
-        if is_model_train_finished(resume_dir, funct='train'): ##if model was already successfully trained, just init the pipeline (made by the previously stored components) and return it
+        if is_model_train_finished(resume_dir, funct='train_pipeline'): ##if model was already successfully trained, just init the pipeline (made by the previously stored components) and return it
             model = io_utils.load_model(resume_dir+f'/{io_utils.MODEL_FILENAME}')
             scaler = io_utils.load_model(resume_dir+f'/{io_utils.SCALER_FILENAME}')
             extractor = io_utils.load_model(resume_dir+f'/{io_utils.FEATURE_EXTRACTOR_FILENAME}', validate_input=False)
@@ -52,15 +40,16 @@ def train_pipeline(texts: str | list[str] | pd.Series = None, categories: np.nda
             io_utils.save_model(pipeline, filename_path=str(pipeline.saving_directory)+f'/{io_utils.PIPELINE_FILENAME}', validate_input=False)
             return pipeline
 
-        meta = validate_meta_file(str(resume_dir)+f'/{io_utils.META_FILENAME}')
-        model = eval(meta[resume_utils.MODEL_TYPE_ATTRIBUTE])
+       
+        
+        model = eval(meta_obj[resume_utils.MODEL_TYPE_ATTRIBUTE])
         categories = pd.read_parquet(resume_dir + f'/{io_utils.TEXTS_FILENAME}', columns=[io_utils.CATEGORY_NAME_IN_STORED_DF])[io_utils.CATEGORY_NAME_IN_STORED_DF]
-        if is_normalization_finished(resume_dir, funct='train'):
+        if is_normalization_finished(resume_dir, funct='train_pipeline'):
             X_feats = get_processed_features(resume_dir)
             extractor = io_utils.load_model(resume_dir+f'/{io_utils.FEATURE_EXTRACTOR_FILENAME}', validate_input=False)
             scaler = io_utils.load_model(resume_dir + f'/{io_utils.SCALER_FILENAME}')
         else:
-            scaler = eval(meta[resume_utils.SCALER_TYPE_ATTRIBUTE])
+            scaler = eval(meta_obj[resume_utils.SCALER_TYPE_ATTRIBUTE])
             try:
                 extractor = io_utils.load_model(resume_dir+f'/{io_utils.FEATURE_EXTRACTOR_FILENAME}', validate_input=False)
                 
@@ -70,13 +59,17 @@ def train_pipeline(texts: str | list[str] | pd.Series = None, categories: np.nda
                     X_feats = extractor.transform(resume_dir=resume_dir, X=None)
             except:                
                 orig_texts, orig_categories = (texts:=pd.read_parquet(resume_dir + f'/{io_utils.TEXTS_FILENAME}'))[io_utils.TEXT_NAME_IN_STORED_DF], texts[io_utils.CATEGORY_NAME_IN_STORED_DF]
-                extract_tfidf = meta[resume_utils.TFIDF_BOOL_ATTRIBUTE]
-                ngram_range = meta[resume_utils.NGRAM_RANGE_ATTRIBUTE]
-                top_k = meta[resume_utils.TOP_K_ATTRIBUTE]
-                batch_size = meta[resume_utils.BATCH_SIZE_ATTRIBUTE]
-                return train_pipeline(texts=orig_texts, categories=orig_categories, extract_tfidf=extract_tfidf,
-                                      ngram_range=ngram_range, top_k=top_k,
-                                      batch_size=batch_size, save=True, saving_directory=resume_dir)
+                extract_tfidf = meta_obj[resume_utils.TFIDF_BOOL_ATTRIBUTE]
+                ngram_range = meta_obj[resume_utils.NGRAM_RANGE_ATTRIBUTE]
+                top_k = meta_obj[resume_utils.TOP_K_ATTRIBUTE]
+                batch_size = meta_obj[resume_utils.BATCH_SIZE_ATTRIBUTE]
+                
+                extractor=FeatureExtractor(extract_tfidf=extract_tfidf, ngram_range=ngram_range, top_k=top_k)
+                extractor.fit(X=orig_texts, y=orig_categories)
+                io_utils.save_model(obj=extractor.tfidf_extractor, filename_path=saving_directory+f'/{io_utils.TFIDF_EXTRACTOR_FILENAME}', validate_input=False)
+                io_utils.save_model(obj=extractor, filename_path=saving_directory+f'/{io_utils.FEATURE_EXTRACTOR_FILENAME}', validate_input=False)
+
+                X_feats = extractor.transform(X=orig_texts, saving_directory=saving_directory, batch_size=batch_size)
 
         pipeline = SavingPipeline(clf=model, scaler=scaler, extractor=extractor) ##CREATING PIPELINE TO FIT SCALER AND MODEL ON CURRENT RESUMED X_FEATS
         object.__setattr__(pipeline, 'saving_directory', resume_dir) ##setting saving directory to resume_dir for future runs
@@ -111,7 +104,7 @@ def train_pipeline(texts: str | list[str] | pd.Series = None, categories: np.nda
         if extract_tfidf:
             ngram_range, top_k = get_ngram_topk_from_tfidf_extractor(pipeline[pipeline.steps[0][0]].tfidf_extractor)
         meta_obj = {} ##Meta parameters for any future resumes
-        meta_obj[resume_utils.FUNCTION_ATTRIBUTE] = 'train'
+        meta_obj[resume_utils.FUNCTION_ATTRIBUTE] = 'train_pipeline'
         meta_obj[resume_utils.NUMBER_OF_TEXTS_ATTRIBUTE] = len(texts)
         meta_obj[resume_utils.BATCH_SIZE_ATTRIBUTE] = batch_size
         meta_obj[resume_utils.MODEL_DIR_ATTRIBUTE] = saving_directory
@@ -149,10 +142,13 @@ def predict_pipeline(texts: str | list[str] | pd.Series = None, pipeline: Saving
             return predictions
         if not is_valid_resume_dir(resume_dir):
             raise ValueError('Cannot resume from chosen resume directory - missing meta/texts files.')
-        
+        meta_obj = validate_meta_file(str(resume_dir)+f'/{io_utils.META_FILENAME}')
+        if not is_running_function_feasible_with_resume_function(running_funct='predict_pipeline', resume_funct=meta_obj[resume_utils.FUNCTION_ATTRIBUTE]):
+            raise ValueError(f'Cannot resume predictions from a directory created to {meta_obj[resume_utils.FUNCTION_ATTRIBUTE]}')
+            
+        _is_valid_meta_dict_(meta_dict=meta_obj, running_funct='predict_pipeline')
         save=True
         saving_directory = resume_dir
-        meta_obj = validate_meta_file(str(resume_dir)+'/'+io_utils.META_FILENAME)
         model_dir = meta_obj[resume_utils.MODEL_DIR_ATTRIBUTE]
         if io_utils.PIPELINE_FILENAME not in io_utils.get_whole_filelist(path_str=model_dir):
             raise ValueError('Cannot recover pipeline originally used to predict these resumen directory texts.')
@@ -222,12 +218,18 @@ def train(texts: list|pd.Series = None, categories: list|pd.Series = None, save:
     """
     
     if to_resume_flag(resume_dir): ##RESUMING
-        if not is_valid_resume_dir(resume_dir):
-            raise ValueError('Cannot resume from chosen resume directory')
-        
         if is_model_train_finished(resume_dir, funct='train'):
             print('Model was already fitted.')
             return io_utils.load_model(resume_dir + f'/{io_utils.MODEL_FILENAME}')
+            
+        if not is_valid_resume_dir(resume_dir):
+            raise ValueError('Cannot resume from chosen resume directory')
+        
+        meta_obj = validate_meta_file(str(resume_dir)+f'/{io_utils.META_FILENAME}')
+        if not is_running_function_feasible_with_resume_function(running_funct='train', resume_funct=meta_obj[resume_utils.FUNCTION_ATTRIBUTE]):
+            raise ValueError(f'Cannot resume training from a directory previously created to {meta_obj[resume_utils.FUNCTION_ATTRIBUTE]}')
+            
+        _is_valid_meta_dict_(meta_dict=meta_obj, running_funct='train')
         
         save=True
         saving_directory = resume_dir
@@ -324,16 +326,19 @@ def train(texts: list|pd.Series = None, categories: list|pd.Series = None, save:
 def predict(texts:  list|pd.Series = None , model_dir: str = None, save: bool = False, batch_size: int = False, resume_dir: str = None, ):
         
     if to_resume_flag(resume_dir):
-        if not is_valid_resume_dir(resume_dir):
-            raise ValueError('Cannot resume from chosen resume directory')
         if is_predictions_finished(resume_dir):
             print('Prediction was already successfully completed')
             predictions = pd.read_parquet(resume_dir+f'/{io_utils.PREDICTIONS_FILENAME}')
             return predictions
-        
+        if not is_valid_resume_dir(resume_dir):
+            raise ValueError('Cannot resume from chosen resume directory')
+        meta_obj = validate_meta_file(str(resume_dir)+'/'+io_utils.META_FILENAME)
+        if not is_running_function_feasible_with_resume_function(running_funct='predict', resume_funct=meta_obj[resume_utils.FUNCTION_ATTRIBUTE]):
+            raise ValueError(f'Cannot resume predictions from a directory created to {meta_obj[resume_utils.FUNCTION_ATTRIBUTE]}')
+            
+        _is_valid_meta_dict_(meta_dict=meta_obj, running_funct='predict')
         save=True
         saving_directory = resume_dir
-        meta_obj = validate_meta_file(str(resume_dir)+'/'+io_utils.META_FILENAME)
         model_dir = meta_obj[resume_utils.MODEL_DIR_ATTRIBUTE]
         
         #batch_size = validate_meta_file(resume_dir+f'/{io_utils.META_FILENAME}')[resume_utils.BATCH_SIZE_ATTRIBUTE] ##No need to handle it, as it is already handled in resume_extract_features.. But can be useful for future updates that handle batch sizes in other parts such as training.

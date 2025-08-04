@@ -23,7 +23,7 @@ TFIDF_BOOL_ATTRIBUTE = 'extract_tfidf'
 TFIDF_EXTRACTOR_ATTRIBUTE = 'tfidf_extractor'
 FIT_TFIDF_ATTRIBUTE = 'fit_tfidf'
 
-__all_possible_funct_resume__ = ["train", 'predict', "extract_features"]
+__all_possible_funct_resume__ = ["train", 'predict', "extract_features", "train_pipeline", "predict_pipeline"]
 
 def __validate_funct__(funct):
     if funct in __all_possible_funct_resume__:
@@ -31,12 +31,12 @@ def __validate_funct__(funct):
     raise ValueError(f"Funct must be be one of: {__all_possible_funct_resume__}")
 
 
-def validate_meta_file(meta_filepath: str | Path) -> bool:
+def validate_meta_file(meta_filepath: str | Path, funct=None) -> bool:
     meta_filepath = Path(meta_filepath)
     if not meta_filepath.exists():
         raise FileNotFoundError(f"Cannot find meta.json file at the specified resume directory. Impossible to resume.")
     meta = __load_meta_file__(meta_filepath)
-    if _is_valid_meta_dict_(meta):
+    if _is_valid_meta_dict_(meta, running_funct=funct):
         if NGRAM_RANGE_ATTRIBUTE in meta:
             meta[NGRAM_RANGE_ATTRIBUTE] = tuple(meta[NGRAM_RANGE_ATTRIBUTE])
         return meta
@@ -59,15 +59,20 @@ def _get_required_meta_params_(funct):
     funct = __validate_funct__(funct)
     required = [NUMBER_OF_TEXTS_ATTRIBUTE, BATCH_SIZE_ATTRIBUTE, FUNCTION_ATTRIBUTE]
     if funct=='train':
-        return required + [NGRAM_RANGE_ATTRIBUTE]
+        return required + [NGRAM_RANGE_ATTRIBUTE, TFIDF_BOOL_ATTRIBUTE, TOP_K_ATTRIBUTE]
     if funct=='predict':
         return required + [MODEL_DIR_ATTRIBUTE]
     if funct=='extract_features':
         return required + [TFIDF_BOOL_ATTRIBUTE]
+    if funct=='train_pipeline':
+        return required + [MODEL_TYPE_ATTRIBUTE, SCALER_TYPE_ATTRIBUTE, FEATURE_EXTRACTOR_ATTRIBUTE, NGRAM_RANGE_ATTRIBUTE, TOP_K_ATTRIBUTE, TFIDF_BOOL_ATTRIBUTE]
+    if funct=='predict_pipeline':
+        return required + [MODEL_DIR_ATTRIBUTE]
     return required
 
-def _is_valid_meta_dict_(meta_dict) -> bool:    
-    funct = meta_dict.get(FUNCTION_ATTRIBUTE, -1)
+def _is_valid_meta_dict_(meta_dict, running_funct=None) -> bool:    
+    
+    funct = meta_dict.get(FUNCTION_ATTRIBUTE, -1) if running_funct is None else running_funct
     if funct==-1:
         raise ValueError(f"'{FUNCTION_ATTRIBUTE}' not defined")
     
@@ -86,6 +91,20 @@ def is_valid_resume_dir(resume_dir: str|Path) -> bool:
     texts_filepath = resume_path.joinpath(io_utils.TEXTS_FILENAME)
     
     return meta_filepath.exists() and texts_filepath.exists()
+    
+    
+def is_running_function_feasible_with_resume_function(running_funct, resume_funct):
+    """
+    Returns a bool, that tells if the new running function is feasible to run resume on previously stored files from resume_funct
+    """
+    return running_funct == resume_funct
+    if running_funct == 'extract_features':
+        return True
+    if running_funct == 'train':
+        return (resume_funct=='train_pipeline' or resume_funct=='train')
+    if running_funct in ['predict', 'predict_pipeline']:
+        return resume_funct in ['predict', 'predict_pipeline']
+    return running_funct == resume_funct
 
 
 
@@ -202,7 +221,7 @@ def resume_extract_features(resume_dir):
     processed_features = get_processed_features(resume_dir)
     processed_tokens = get_processed_tfidf_tokens(resume_dir)
     
-    meta = validate_meta_file(Path(resume_dir).joinpath(io_utils.META_FILENAME)) ##checking all of the current needed attributes are stored in the json file
+    meta = validate_meta_file(Path(resume_dir).joinpath(io_utils.META_FILENAME), funct='extract_features') ##checking all of the current needed attributes are stored in the json file
     funct = meta[FUNCTION_ATTRIBUTE]
     batch_size = meta[BATCH_SIZE_ATTRIBUTE]
     total_texts = meta[NUMBER_OF_TEXTS_ATTRIBUTE]
