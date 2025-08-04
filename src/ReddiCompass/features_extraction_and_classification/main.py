@@ -14,6 +14,63 @@ from pathlib import Path
 import shutil
 
 
+
+def __old_resume_train_pipeline_from_components__(resume_dir):
+    if not resume_utils.is_valid_resume_dir(resume_dir):
+        raise ValueError(f'Cannot resume from {resume_dir}')
+
+    meta_obj = validate_meta_file(str(resume_dir)+f'/{io_utils.META_FILENAME}')
+    if not is_running_function_feasible_with_resume_function(running_funct='train_pipeline', resume_funct=meta_obj[resume_utils.FUNCTION_ATTRIBUTE]):
+        raise ValueError(f'Cannot resume training from a directory previously created to {meta_obj[resume_utils.FUNCTION_ATTRIBUTE]}')
+        
+    _is_valid_meta_dict_(meta_dict=meta_obj, running_funct='train_pipeline')
+    
+    save = True
+    saving_directory = resume_dir
+    scaler, clf, extract_tfidf, ngram_range, top_k, texts, categories, batch_size = None, None, None, None, None, None, None, None
+    if is_model_train_finished(resume_dir, funct='train_pipeline'): ##if model was already successfully trained, just init the pipeline (made by the previously stored components) and return it
+        model = io_utils.load_model(resume_dir+f'/{io_utils.MODEL_FILENAME}')
+        scaler = io_utils.load_model(resume_dir+f'/{io_utils.SCALER_FILENAME}')
+        extractor = io_utils.load_model(resume_dir+f'/{io_utils.FEATURE_EXTRACTOR_FILENAME}', validate_input=False)
+        pipeline = SavingPipeline(clf=model, scaler=scaler, extractor=extractor)
+        object.__setattr__(pipeline, 'saving_directory', resume_dir) ##setting saving directory to resume_dir for future runs
+        io_utils.save_model(pipeline, filename_path=str(pipeline.saving_directory)+f'/{io_utils.PIPELINE_FILENAME}', validate_input=False)
+        return pipeline
+    
+    model = eval(meta_obj[resume_utils.MODEL_TYPE_ATTRIBUTE])
+    categories = pd.read_parquet(resume_dir + f'/{io_utils.TEXTS_FILENAME}', columns=[io_utils.CATEGORY_NAME_IN_STORED_DF])[io_utils.CATEGORY_NAME_IN_STORED_DF]
+    if is_normalization_finished(resume_dir, funct='train_pipeline'):
+        X_feats = get_processed_features(resume_dir)
+        extractor = io_utils.load_model(resume_dir+f'/{io_utils.FEATURE_EXTRACTOR_FILENAME}', validate_input=False)
+        scaler = io_utils.load_model(resume_dir + f'/{io_utils.SCALER_FILENAME}')
+    else:
+        scaler = eval(meta_obj[resume_utils.SCALER_TYPE_ATTRIBUTE])
+        try:
+            extractor = io_utils.load_model(resume_dir+f'/{io_utils.FEATURE_EXTRACTOR_FILENAME}', validate_input=False)
+            
+            if _is_features_extraction_finished_(resume_dir=resume_dir, check_tfidf_features=extract_tfidf):
+                X_feats = get_processed_features(resume_dir)
+            else:
+                X_feats = extractor.transform(resume_dir=resume_dir, X=None)
+        except:                
+            orig_texts, orig_categories = (texts:=pd.read_parquet(resume_dir + f'/{io_utils.TEXTS_FILENAME}'))[io_utils.TEXT_NAME_IN_STORED_DF], texts[io_utils.CATEGORY_NAME_IN_STORED_DF]
+            extract_tfidf = meta_obj[resume_utils.TFIDF_BOOL_ATTRIBUTE]
+            ngram_range = meta_obj[resume_utils.NGRAM_RANGE_ATTRIBUTE]
+            top_k = meta_obj[resume_utils.TOP_K_ATTRIBUTE]
+            batch_size = meta_obj[resume_utils.BATCH_SIZE_ATTRIBUTE]
+            
+            extractor=FeatureExtractor(extract_tfidf=extract_tfidf, ngram_range=ngram_range, top_k=top_k)
+            extractor.fit(X=orig_texts, y=orig_categories)
+            io_utils.save_model(obj=extractor.tfidf_extractor, filename_path=saving_directory+f'/{io_utils.TFIDF_EXTRACTOR_FILENAME}', validate_input=False)
+            io_utils.save_model(obj=extractor, filename_path=saving_directory+f'/{io_utils.FEATURE_EXTRACTOR_FILENAME}', validate_input=False)
+
+            X_feats = extractor.transform(X=orig_texts, saving_directory=saving_directory, batch_size=batch_size)
+
+    pipeline = SavingPipeline(clf=model, scaler=scaler, extractor=extractor) ##CREATING PIPELINE TO FIT SCALER AND MODEL ON CURRENT RESUMED X_FEATS
+    object.__setattr__(pipeline, 'saving_directory', resume_dir) ##setting saving directory to resume_dir for future runs
+
+   
+    
 def train_pipeline(texts: str | list[str] | pd.Series = None, categories: np.ndarray | pd.Series | list = None, extract_tfidf: bool = True, ngram_range: tuple[int,int] = None, top_k: int = None, scaler: BaseEstimator = MinMaxScaler(), clf: BaseEstimator = LinearSVC(), batch_size: int = -1, save: bool = True, saving_directory: str = None, resume_dir: str = None, raise_errors_on_wrong_indexes: bool = False):
     if to_resume_flag(resume_dir):
         if is_pipeline_stored(resume_dir):
@@ -27,52 +84,46 @@ def train_pipeline(texts: str | list[str] | pd.Series = None, categories: np.nda
             raise ValueError(f'Cannot resume training from a directory previously created to {meta_obj[resume_utils.FUNCTION_ATTRIBUTE]}')
             
         _is_valid_meta_dict_(meta_dict=meta_obj, running_funct='train_pipeline')
-        
         save = True
         saving_directory = resume_dir
         scaler, clf, extract_tfidf, ngram_range, top_k, texts, categories, batch_size = None, None, None, None, None, None, None, None
-        if is_model_train_finished(resume_dir, funct='train_pipeline'): ##if model was already successfully trained, just init the pipeline (made by the previously stored components) and return it
-            model = io_utils.load_model(resume_dir+f'/{io_utils.MODEL_FILENAME}')
-            scaler = io_utils.load_model(resume_dir+f'/{io_utils.SCALER_FILENAME}')
+        to_fit = False
+        try:
             extractor = io_utils.load_model(resume_dir+f'/{io_utils.FEATURE_EXTRACTOR_FILENAME}', validate_input=False)
-            pipeline = SavingPipeline(clf=model, scaler=scaler, extractor=extractor)
-            object.__setattr__(pipeline, 'saving_directory', resume_dir) ##setting saving directory to resume_dir for future runs
-            io_utils.save_model(pipeline, filename_path=str(pipeline.saving_directory)+f'/{io_utils.PIPELINE_FILENAME}', validate_input=False)
-            return pipeline
-
-       
-        
-        model = eval(meta_obj[resume_utils.MODEL_TYPE_ATTRIBUTE])
-        categories = pd.read_parquet(resume_dir + f'/{io_utils.TEXTS_FILENAME}', columns=[io_utils.CATEGORY_NAME_IN_STORED_DF])[io_utils.CATEGORY_NAME_IN_STORED_DF]
-        if is_normalization_finished(resume_dir, funct='train_pipeline'):
+            categories = pd.read_parquet(resume_dir + f'/{io_utils.TEXTS_FILENAME}', columns=[io_utils.CATEGORY_NAME_IN_STORED_DF])[io_utils.CATEGORY_NAME_IN_STORED_DF]
+        except:
+            to_fit = True
+            extract_tfidf, ngram_range, top_k = meta_obj[resume_utils.TFIDF_BOOL_ATTRIBUTE], meta_obj[resume_utils.NGRAM_RANGE_ATTRIBUTE], meta_obj[resume_utils.TOP_K_ATTRIBUTE]
+            extractor=FeatureExtractor(extract_tfidf=extract_tfidf, ngram_range=ngram_range, top_k=top_k)
+            texts_and_cats_df = pd.read_parquet(resume_dir + f'/{io_utils.TEXTS_FILENAME}')
+            texts, categories = texts_and_cats_df[io_utils.TEXT_NAME_IN_STORED_DF], texts_and_cats_df[io_utils.CATEGORY_NAME_IN_STORED_DF]
+            extractor.fit(X=texts, y=categories)
+            if extract_tfidf:
+                io_utils.save_model(obj=extractor.tfidf_extractor, filename_path=resume_dir+f'/{io_utils.TFIDF_EXTRACTOR_FILENAME}', validate_input=False)
+            io_utils.save_model(obj=extractor, filename_path=resume_dir+f'/{io_utils.FEATURE_EXTRACTOR_FILENAME}', validate_input=False)
+        if _is_features_extraction_finished_(resume_dir=resume_dir, check_tfidf_features=extract_tfidf):
             X_feats = get_processed_features(resume_dir)
-            extractor = io_utils.load_model(resume_dir+f'/{io_utils.FEATURE_EXTRACTOR_FILENAME}', validate_input=False)
-            scaler = io_utils.load_model(resume_dir + f'/{io_utils.SCALER_FILENAME}')
         else:
+            to_fit = True
+            X_feats = extractor.transform(resume_dir=resume_dir, X=None)
+            
+        try:
+            scaler = io_utils.load_model(resume_dir + f'/{io_utils.SCALER_FILENAME}')
+        except:
+            to_fit = True
             scaler = eval(meta_obj[resume_utils.SCALER_TYPE_ATTRIBUTE])
-            try:
-                extractor = io_utils.load_model(resume_dir+f'/{io_utils.FEATURE_EXTRACTOR_FILENAME}', validate_input=False)
-                
-                if _is_features_extraction_finished_(resume_dir=resume_dir, check_tfidf_features=extract_tfidf):
-                    X_feats = get_processed_features(resume_dir)
-                else:
-                    X_feats = extractor.transform(resume_dir=resume_dir, X=None)
-            except:                
-                orig_texts, orig_categories = (texts:=pd.read_parquet(resume_dir + f'/{io_utils.TEXTS_FILENAME}'))[io_utils.TEXT_NAME_IN_STORED_DF], texts[io_utils.CATEGORY_NAME_IN_STORED_DF]
-                extract_tfidf = meta_obj[resume_utils.TFIDF_BOOL_ATTRIBUTE]
-                ngram_range = meta_obj[resume_utils.NGRAM_RANGE_ATTRIBUTE]
-                top_k = meta_obj[resume_utils.TOP_K_ATTRIBUTE]
-                batch_size = meta_obj[resume_utils.BATCH_SIZE_ATTRIBUTE]
-                
-                extractor=FeatureExtractor(extract_tfidf=extract_tfidf, ngram_range=ngram_range, top_k=top_k)
-                extractor.fit(X=orig_texts, y=orig_categories)
-                io_utils.save_model(obj=extractor.tfidf_extractor, filename_path=saving_directory+f'/{io_utils.TFIDF_EXTRACTOR_FILENAME}', validate_input=False)
-                io_utils.save_model(obj=extractor, filename_path=saving_directory+f'/{io_utils.FEATURE_EXTRACTOR_FILENAME}', validate_input=False)
-
-                X_feats = extractor.transform(X=orig_texts, saving_directory=saving_directory, batch_size=batch_size)
-
+        try:
+            model = io_utils.load_model(resume_dir+f'/{io_utils.MODEL_FILENAME}')
+        except:
+            to_fit = True
+            model = eval(meta_obj[resume_utils.MODEL_TYPE_ATTRIBUTE])
+        
         pipeline = SavingPipeline(clf=model, scaler=scaler, extractor=extractor) ##CREATING PIPELINE TO FIT SCALER AND MODEL ON CURRENT RESUMED X_FEATS
         object.__setattr__(pipeline, 'saving_directory', resume_dir) ##setting saving directory to resume_dir for future runs
+        if not to_fit:
+            io_utils.save_model(pipeline, filename_path=pipeline.saving_directory+f'/{io_utils.PIPELINE_FILENAME}', validate_input=False)
+            return pipeline
+            
 
 
     else:     ##FRESH NEW RUN, NO RESUMING
@@ -117,7 +168,8 @@ def train_pipeline(texts: str | list[str] | pd.Series = None, categories: np.nda
         store_meta_file(meta_obj, saving_dir=saving_directory) ##Storing meta parameters
         
         pipeline['features_extractor'].fit(X=texts, y=categories)
-        io_utils.save_model(obj=pipeline['features_extractor'].tfidf_extractor, filename_path=pipeline.saving_directory+f'/{io_utils.TFIDF_EXTRACTOR_FILENAME}', validate_input=False)
+        if extract_tfidf:
+            io_utils.save_model(obj=pipeline['features_extractor'].tfidf_extractor, filename_path=pipeline.saving_directory+f'/{io_utils.TFIDF_EXTRACTOR_FILENAME}', validate_input=False)
         io_utils.save_model(pipeline['features_extractor'], filename_path=pipeline.saving_directory+f'/{io_utils.FEATURE_EXTRACTOR_FILENAME}', validate_input=False)
 
         X_feats = pipeline['features_extractor'].transform(X=texts, saving_directory=pipeline.saving_directory, batch_size=batch_size)
@@ -406,4 +458,9 @@ def get_default_scaler():
     
 def get_default_model():
     from sklearn.svm import LinearSVC
+    return LinearSVC()
+    return LinearSVC()
+    return LinearSVC()
+    return LinearSVC()
+    return LinearSVC()
     return LinearSVC()

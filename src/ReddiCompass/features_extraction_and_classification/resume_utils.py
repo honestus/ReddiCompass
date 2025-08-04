@@ -37,7 +37,7 @@ def validate_meta_file(meta_filepath: str | Path, funct=None) -> bool:
         raise FileNotFoundError(f"Cannot find meta.json file at the specified resume directory. Impossible to resume.")
     meta = __load_meta_file__(meta_filepath)
     if _is_valid_meta_dict_(meta, running_funct=funct):
-        if NGRAM_RANGE_ATTRIBUTE in meta:
+        if NGRAM_RANGE_ATTRIBUTE in meta and meta.get(NGRAM_RANGE_ATTRIBUTE, None):
             meta[NGRAM_RANGE_ATTRIBUTE] = tuple(meta[NGRAM_RANGE_ATTRIBUTE])
         return meta
     raise ValueError('wrong meta file')
@@ -257,21 +257,23 @@ def resume_extract_features(resume_dir):
             #raise NotImplementedError()
             tfidf_extractor = io_utils.load_model(filename_path=meta[TFIDF_EXTRACTOR_ATTRIBUTE], validate_input=False)
             fit_tfidf = meta[FIT_TFIDF_ATTRIBUTE]
-        
+    elif funct in ['train_pipeline', 'predict_pipeline']:
+        model_dir = meta[MODEL_DIR_ATTRIBUTE]
+        tfidf_extractor = io_utils.load_model(str(model_dir)+f'/{io_utils.FEATURE_EXTRACTOR_FILENAME}', validate_input=False).tfidf_extractor
     else:
         raise NotImplementedError('Invalid resume_dir, it must be either a previously stored directory from train,  predict, or extract_features')
     
-    if processed_tokens.empty or processed_features.empty:
+    if processed_features.empty or (processed_tokens.empty and extract_tfidf_bool) :
         print(f"Resuming features extraction --- No previously stored features files")        
         if funct=='train':
             return _extract_features_in_batches(texts=orig_texts[io_utils.TEXT_NAME_IN_STORED_DF], categories=orig_texts[io_utils.CATEGORY_NAME_IN_STORED_DF], 
             extract_tfidf = extract_tfidf_bool,
             tfidf_extractor=tfidf_extractor, 
-            fit_tfidf=True, 
+            fit_tfidf=True and extract_tfidf_bool, 
             ngram_range=ngram_range,
             batch_size=batch_size, 
             saving_directory=str(resume_dir))
-        elif funct=='predict':
+        elif funct in ['predict', 'train_pipeline', 'predict_pipeline']:
             return _extract_features_in_batches(texts=orig_texts[io_utils.TEXT_NAME_IN_STORED_DF], 
             extract_tfidf = extract_tfidf_bool,
             tfidf_extractor=tfidf_extractor, 
@@ -294,7 +296,7 @@ def resume_extract_features(resume_dir):
     tokens_files_indexes = [int(Path(f).stem.split(Path(io_utils.TFIDF_TOKENS_FILENAME).stem+'_batch')[-1]) for f in curr_tokens_files]
     
     ###Checking that previously processed features and tokens are from the same imput texts - otherwise just keeping the texts processed for both features and tokens and re-processing all of the remaining ones 
-    if sorted(processed_features.index) != sorted(processed_tokens.index): 
+    if extract_tfidf_bool and (sorted(processed_features.index) != sorted(processed_tokens.index)): 
         common_processed_texts_idx = processed_features.index.intersection(processed_tokens.index) ##getting processed texts for both features and tfidftokens
         processed_features = processed_features.loc[common_processed_texts_idx]
         processed_tokens = processed_tokens.loc[common_processed_texts_idx]
@@ -314,10 +316,11 @@ def resume_extract_features(resume_dir):
     unprocessed_texts = orig_texts.loc[~orig_texts.index.isin(processed_features.index)] ## we will resume and only process the texts that havent been processed yet
 
     print(f"Resuming features extraction --- Last saved index: {max(saved_indexes_filenames)}")
-    processed_tokens = processed_tokens[processed_tokens.columns[0]] ##mapping to Series to avoid any error in extracting. DataFrame was only necessary to store in parquet file.
+    
+    processed_tokens = processed_tokens[processed_tokens.columns[0]] if extract_tfidf_bool else None ##mapping to Series to avoid any error in extracting. DataFrame was only necessary to store in parquet file.
     if funct=='train':
         return _extract_features_in_batches(texts=unprocessed_texts[io_utils.TEXT_NAME_IN_STORED_DF], categories=orig_texts[io_utils.CATEGORY_NAME_IN_STORED_DF], 
-        extract_tfidf=True,
+        extract_tfidf=extract_tfidf_bool,
         tfidf_extractor=tfidf_extractor, 
         fit_tfidf=True, 
         ngram_range=ngram_range,
@@ -328,10 +331,10 @@ def resume_extract_features(resume_dir):
         already_processed_tokens_batches = processed_tokens,
         )        
         
-    elif funct=='predict':
+    elif funct in ['predict', 'train_pipeline', 'predict_pipeline']:
         return _extract_features_in_batches(
         texts=unprocessed_texts[io_utils.TEXT_NAME_IN_STORED_DF],
-        extract_tfidf=True,
+        extract_tfidf=extract_tfidf_bool,
         tfidf_extractor = tfidf_extractor,
         fit_tfidf=False,
         saving_directory=str(resume_dir),
@@ -344,7 +347,7 @@ def resume_extract_features(resume_dir):
     elif funct=='extract_features':
         if extract_tfidf_bool:
             return _extract_features_in_batches(texts=unprocessed_texts[io_utils.TEXT_NAME_IN_STORED_DF], categories=orig_texts[io_utils.CATEGORY_NAME_IN_STORED_DF], 
-            extract_tfidf=True,
+            extract_tfidf=extract_tfidf_bool,
             tfidf_extractor=tfidf_extractor, 
             fit_tfidf=fit_tfidf, 
             saving_directory=str(resume_dir), 
